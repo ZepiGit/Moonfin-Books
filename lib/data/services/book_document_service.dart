@@ -2,17 +2,14 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:kindle_unpack/kindle_unpack.dart';
 import 'package:server_core/server_core.dart';
 
 import 'book_reader_service.dart';
 
-enum BookDocumentTheme {
-  light,
-  dark,
-  sepia,
-}
+enum BookDocumentTheme { light, dark, sepia }
 
 @immutable
 class BookDocumentStyle {
@@ -49,6 +46,36 @@ class BookDocumentService {
     List<Uri> uris,
     Map<String, String> headers,
   ) async {
+    if (kIsWeb) {
+      Object? lastError;
+      final dio = Dio();
+      for (final uri in uris.where(
+        (uri) => uri.scheme == 'https' || uri.scheme == 'http',
+      )) {
+        try {
+          final response = await dio.get<List<int>>(
+            uri.toString(),
+            options: Options(
+              headers: headers,
+              responseType: ResponseType.bytes,
+              followRedirects: false,
+              validateStatus: (_) => true,
+            ),
+          );
+          if ((response.statusCode ?? 0) >= 200 &&
+              (response.statusCode ?? 0) < 300 &&
+              response.data != null) {
+            return Uint8List.fromList(response.data!);
+          }
+          lastError = HttpException(
+            'HTTP ${response.statusCode} while downloading book data',
+          );
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      throw lastError ?? const HttpException('Failed to download book data');
+    }
     final client = HttpClient()..userAgent = serverUserAgent;
     try {
       HttpException? lastError;
@@ -94,6 +121,48 @@ class BookDocumentService {
     List<Uri> uris,
     Map<String, String> headers,
   ) async {
+    if (kIsWeb) {
+      final dio = Dio();
+      for (final uri in uris.where(
+        (uri) => uri.scheme == 'https' || uri.scheme == 'http',
+      )) {
+        try {
+          final response = await dio.get<List<int>>(
+            uri.toString(),
+            options: Options(
+              headers: {...headers, 'Range': 'bytes=0-0'},
+              responseType: ResponseType.bytes,
+              followRedirects: false,
+              validateStatus: (_) => true,
+            ),
+          );
+          if ((response.statusCode ?? 0) < 200 ||
+              (response.statusCode ?? 0) >= 400) {
+            continue;
+          }
+          final disposition = response.headers.value('content-disposition');
+          final mime = response.headers
+              .value('content-type')
+              ?.split(';')
+              .first
+              .toLowerCase();
+          final extension =
+              BookReaderService.extractExtensionFromContentDisposition(
+                disposition,
+              ) ??
+              BookReaderService.extensionFromMime(mime) ??
+              BookReaderService.extractExtensionFromFileName(
+                uri.pathSegments.last,
+              );
+          if (BookReaderService.isSupportedExtension(extension)) {
+            return extension;
+          }
+        } catch (_) {
+          continue;
+        }
+      }
+      return null;
+    }
     final client = HttpClient()..userAgent = serverUserAgent;
     try {
       for (final uri in uris) {
@@ -122,7 +191,9 @@ class BookDocumentService {
         await response.drain<void>();
 
         final fromDisposition =
-            BookReaderService.extractExtensionFromContentDisposition(disposition);
+            BookReaderService.extractExtensionFromContentDisposition(
+              disposition,
+            );
         if (BookReaderService.isSupportedExtension(fromDisposition)) {
           return fromDisposition;
         }
@@ -160,9 +231,8 @@ class BookDocumentService {
   /// returned by [extractEpubChapterHtml], and a [depth] for indentation
   /// (0 = top-level, 1 = sub-section, etc.).
   /// Returns an empty list if no TOC can be found.
-  static List<({String title, int chapterIndex, int depth})> extractEpubTocEntries(
-    Uint8List bytes,
-  ) {
+  static List<({String title, int chapterIndex, int depth})>
+  extractEpubTocEntries(Uint8List bytes) {
     try {
       final archive = ZipDecoder().decodeBytes(bytes);
       final files = <String, List<int>>{};
@@ -186,7 +256,9 @@ class BookDocumentService {
       for (var i = 0; i < spine.chapterHrefs.length; i++) {
         final h = spine.chapterHrefs[i];
         hrefToIndex[h] = i;
-        final basename = h.contains('/') ? h.substring(h.lastIndexOf('/') + 1) : h;
+        final basename = h.contains('/')
+            ? h.substring(h.lastIndexOf('/') + 1)
+            : h;
         hrefToIndex.putIfAbsent(basename, () => i);
       }
 
@@ -259,7 +331,11 @@ class BookDocumentService {
             : src;
         final idx = hrefToIndex[src] ?? hrefToIndex[basename];
         if (idx != null && pendingTitle.isNotEmpty) {
-          result.add((title: pendingTitle, chapterIndex: idx, depth: depth - 1));
+          result.add((
+            title: pendingTitle,
+            chapterIndex: idx,
+            depth: depth - 1,
+          ));
         }
         pendingTitle = null;
       }
@@ -267,15 +343,15 @@ class BookDocumentService {
     return result;
   }
 
-  static List<({String title, int chapterIndex, int depth})> _parseEpub3NavEntries(
-    String navHtml,
-    Map<String, int> hrefToIndex,
-  ) {
+  static List<({String title, int chapterIndex, int depth})>
+  _parseEpub3NavEntries(String navHtml, Map<String, int> hrefToIndex) {
     final result = <({String title, int chapterIndex, int depth})>[];
-    final tocNavStart = RegExp(
-      r'<nav\b[^>]*epub:type="[^"]*toc[^"]*"',
-      caseSensitive: false,
-    ).firstMatch(navHtml)?.start ?? 0;
+    final tocNavStart =
+        RegExp(
+          r'<nav\b[^>]*epub:type="[^"]*toc[^"]*"',
+          caseSensitive: false,
+        ).firstMatch(navHtml)?.start ??
+        0;
     var listDepth = 0;
     final reg = RegExp(
       r'<ol\b|</ol\b|<a\b[^>]+href="([^"]*)"[^>]*>(.*?)</a>',
@@ -300,7 +376,11 @@ class BookDocumentService {
             .replaceAll(RegExp(r'<[^>]+>'), '')
             .trim();
         if (idx != null && title.isNotEmpty) {
-          result.add((title: title, chapterIndex: idx, depth: (listDepth - 1).clamp(0, 10)));
+          result.add((
+            title: title,
+            chapterIndex: idx,
+            depth: (listDepth - 1).clamp(0, 10),
+          ));
         }
       }
     }
@@ -360,12 +440,14 @@ class BookDocumentService {
           : '';
       final chapterBody = _extractHtmlBody(utf8.decode(chapterBytes));
       final sanitized = _inlineLocalImages(chapterBody, chapterDir, files);
-      chapters.add(_wrapEpubChapterHtml(
-        cssBuffer.toString(),
-        sanitized,
-        theme: theme,
-        style: style,
-      ));
+      chapters.add(
+        _wrapEpubChapterHtml(
+          cssBuffer.toString(),
+          sanitized,
+          theme: theme,
+          style: style,
+        ),
+      );
     }
 
     if (chapters.isEmpty) {
@@ -400,13 +482,11 @@ class BookDocumentService {
     }
 
     final chapterHrefs = <String>[];
-    final spineRegex = RegExp(
-      r'<itemref\b([^>]*)/?\s*>',
-      caseSensitive: false,
-    );
+    final spineRegex = RegExp(r'<itemref\b([^>]*)/?\s*>', caseSensitive: false);
     for (final m in spineRegex.allMatches(xml)) {
-      final idref =
-          RegExp(r'idref="([^"]+)"').firstMatch(m.group(1)!)?.group(1);
+      final idref = RegExp(r'idref="([^"]+)"')
+          .firstMatch(m.group(1)!)
+          ?.group(1);
       if (idref != null && manifest.containsKey(idref)) {
         chapterHrefs.add(manifest[idref]!.href);
       }
@@ -433,8 +513,10 @@ class BookDocumentService {
   /// instead of inlined so a single oversized scan cannot crash the webview.
   static const _maxInlineImageBytes = 10 * 1024 * 1024;
 
-  static final _imgSrcAttr =
-      RegExp(r'''src\s*=\s*["']([^"']*)["']''', caseSensitive: false);
+  static final _imgSrcAttr = RegExp(
+    r'''src\s*=\s*["']([^"']*)["']''',
+    caseSensitive: false,
+  );
   static final _svgImageHref = RegExp(
     r'''(?:xlink:)?href\s*=\s*["']([^"']*)["']''',
     caseSensitive: false,
@@ -460,7 +542,8 @@ class BookDocumentService {
           return '';
         }
 
-        final isRemote = src.startsWith('http://') ||
+        final isRemote =
+            src.startsWith('http://') ||
             src.startsWith('https://') ||
             src.startsWith('data:');
         if (isRemote) {
@@ -530,8 +613,8 @@ class BookDocumentService {
     final mime = _imageMimeFor(path);
     if (mime == null) return null;
 
-    final bytes = files[_resolveZipPath(baseDir, path)] ??
-        _findByBasename(path, files);
+    final bytes =
+        files[_resolveZipPath(baseDir, path)] ?? _findByBasename(path, files);
     if (bytes == null || bytes.length > _maxInlineImageBytes) return null;
     return 'data:$mime;base64,${base64Encode(bytes)}';
   }
@@ -558,12 +641,10 @@ class BookDocumentService {
 
   /// Fallback for EPUBs whose hrefs do not resolve cleanly against the base
   /// directory, so a plain filename still finds its bytes.
-  static List<int>? _findByBasename(
-    String path,
-    Map<String, List<int>> files,
-  ) {
-    final basename =
-        path.contains('/') ? path.substring(path.lastIndexOf('/') + 1) : path;
+  static List<int>? _findByBasename(String path, Map<String, List<int>> files) {
+    final basename = path.contains('/')
+        ? path.substring(path.lastIndexOf('/') + 1)
+        : path;
     if (basename.isEmpty) return null;
     for (final entry in files.entries) {
       if (entry.key == basename || entry.key.endsWith('/$basename')) {
@@ -598,20 +679,20 @@ class BookDocumentService {
 
     final themeColors = switch (theme) {
       BookDocumentTheme.light => (
-          background: '#fafafa',
-          foreground: '#222222',
-          link: '#1b4f9c',
-        ),
+        background: '#fafafa',
+        foreground: '#222222',
+        link: '#1b4f9c',
+      ),
       BookDocumentTheme.dark => (
-          background: '#121212',
-          foreground: '#e7e7e7',
-          link: '#8ab4f8',
-        ),
+        background: '#121212',
+        foreground: '#e7e7e7',
+        link: '#8ab4f8',
+      ),
       BookDocumentTheme.sepia => (
-          background: '#f4ecd8',
-          foreground: '#3e3023',
-          link: '#6b4e2a',
-        ),
+        background: '#f4ecd8',
+        foreground: '#3e3023',
+        link: '#6b4e2a',
+      ),
     };
 
     final background = s.backgroundCss ?? themeColors.background;

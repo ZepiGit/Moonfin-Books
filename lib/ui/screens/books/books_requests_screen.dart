@@ -12,6 +12,7 @@ import '../../../auth/repositories/user_repository.dart';
 import '../../../data/repositories/books_repository.dart';
 import '../../../data/repositories/sheet_music_repository.dart';
 import '../../../data/services/plugin_sync_service.dart';
+import '../../../data/services/media_server_client_factory.dart';
 import '../../../data/viewmodels/books_requests_view_model.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../preference/preference_constants.dart';
@@ -184,12 +185,16 @@ class _BooksRequestsScreenState extends State<BooksRequestsScreen>
   Future<void> _runSearch() =>
       _model.search(_search.text, author: _author.text);
 
-  Future<void> _openSheetMusic() => showDialog<void>(
-    context: context,
-    builder: (_) => SheetMusicSearchDialog(
-      repository: SheetMusicRepository(GetIt.instance<MediaServerClient>()),
-    ),
-  );
+  Future<void> _openSheetMusic() {
+    final client = GetIt.instance<MediaServerClient>();
+    return showDialog<void>(
+      context: context,
+      builder: (_) => SheetMusicSearchDialog(
+        repository: SheetMusicRepository(client),
+        serverId: GetIt.instance<MediaServerClientFactory>().serverIdOf(client),
+      ),
+    );
+  }
 
   Widget _authorField({required bool tv, required bool german}) {
     final hint = german ? 'Autor (optional)' : 'Author (optional)';

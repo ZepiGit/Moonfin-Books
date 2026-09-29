@@ -65,33 +65,33 @@ class BookReaderService {
     return extension != null && supportedExtensions.contains(extension);
   }
 
-  static List<Uri> buildDownloadUris(MediaServerClient client, AggregatedItem item) {
+  static List<Uri> buildDownloadUris(
+    MediaServerClient client,
+    AggregatedItem item,
+  ) {
     final itemId = Uri.encodeComponent(item.id);
     final sourceId = _firstMediaSourceId(item);
     final token = client.accessToken;
     final query = <String, String>{
       'MediaSourceId': ?sourceId,
-      if (token != null && token.isNotEmpty) client.serverType.tokenQueryParam: token,
+      if (token != null && token.isNotEmpty)
+        client.serverType.tokenQueryParam: token,
     };
-    final videoQuery = <String, String>{
-      ...query,
-      'Static': 'true',
-    };
+    final videoQuery = <String, String>{...query, 'Static': 'true'};
 
     final candidates = <Uri>[
-      Uri.parse('${client.baseUrl}/Items/$itemId/Download').replace(
-        queryParameters: query.isEmpty ? null : query,
-      ),
-      Uri.parse('${client.baseUrl}/Items/$itemId/File').replace(
-        queryParameters: query.isEmpty ? null : query,
-      ),
-      Uri.parse('${client.baseUrl}/Videos/$itemId/stream').replace(
-        queryParameters: videoQuery,
-      ),
+      Uri.parse('${client.baseUrl}/Items/$itemId/Download')
+          .replace(queryParameters: query.isEmpty ? null : query),
+      Uri.parse('${client.baseUrl}/Items/$itemId/File')
+          .replace(queryParameters: query.isEmpty ? null : query),
+      Uri.parse('${client.baseUrl}/Videos/$itemId/stream')
+          .replace(queryParameters: videoQuery),
     ];
 
     final unique = <String>{};
-    return candidates.where((uri) => unique.add(uri.toString())).toList(growable: false);
+    return candidates
+        .where((uri) => unique.add(uri.toString()))
+        .toList(growable: false);
   }
 
   static Map<String, String> buildAuthHeaders(MediaServerClient client) {
@@ -100,10 +100,7 @@ class BookReaderService {
       return const {};
     }
 
-    return {
-      'X-Emby-Token': token,
-      'Authorization': 'MediaBrowser Token="$token"',
-    };
+    return {'Authorization': 'MediaBrowser Token="$token"'};
   }
 
   static String? _firstMediaSourceId(AggregatedItem item) {

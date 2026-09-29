@@ -9,9 +9,14 @@ import '../../../util/platform_detection.dart';
 import '../playback/book_reader_screen.dart';
 
 class SheetMusicSearchDialog extends StatefulWidget {
-  const SheetMusicSearchDialog({super.key, required this.repository});
+  const SheetMusicSearchDialog({
+    super.key,
+    required this.repository,
+    this.serverId,
+  });
 
   final SheetMusicRepository repository;
+  final String? serverId;
 
   @override
   State<SheetMusicSearchDialog> createState() => _SheetMusicSearchDialogState();
@@ -142,6 +147,7 @@ class _SheetMusicSearchDialogState extends State<SheetMusicSearchDialog> {
                                 key: ValueKey(piece.id),
                                 piece: piece,
                                 repository: widget.repository,
+                                serverId: widget.serverId,
                                 german: german,
                               );
                             },
@@ -162,10 +168,12 @@ class _ScoreTile extends StatefulWidget {
     super.key,
     required this.piece,
     required this.repository,
+    required this.serverId,
     required this.german,
   });
   final SheetMusicPiece piece;
   final SheetMusicRepository repository;
+  final String? serverId;
   final bool german;
 
   @override
@@ -301,7 +309,7 @@ class _ScoreTileState extends State<_ScoreTile> {
             Wrap(
               spacing: 8,
               children: [
-              if (pdf != null && !PlatformDetection.isWeb)
+                if (pdf != null && !PlatformDetection.isWeb)
                   TextButton(
                     onPressed: () => Navigator.push<void>(
                       context,
@@ -320,8 +328,10 @@ class _ScoreTileState extends State<_ScoreTile> {
                     onPressed: () => Navigator.push<void>(
                       context,
                       MaterialPageRoute(
-                        builder: (_) =>
-                            BookReaderScreen(itemId: _status!.itemId!),
+                        builder: (_) => BookReaderScreen(
+                          itemId: _status!.itemId!,
+                          serverId: widget.serverId,
+                        ),
                       ),
                     ),
                     child: Text(german ? 'In App öffnen' : 'Open in app'),
