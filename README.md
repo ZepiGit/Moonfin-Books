@@ -48,7 +48,7 @@ The fork is intended to use separate app and installer identities so it can coex
 
 See [Build status](docs/BUILD_STATUS.md) for the current package and signing evidence. The fork targets the upstream platform set: Android mobile and TV/Fire TV, iOS, tvOS, macOS, Windows x64/ARM64, Linux x64/ARM64, and web. A target in the source tree does not mean a Moonfin Books package has passed device testing or been published.
 
-The previous [Moonbase Books `2.3.1.100` plugin](https://github.com/ZepiGit/Moonbase-Books/releases/tag/v2.3.1.100-books.1) was deployed and tested with [Jellyfin `12.1`](https://github.com/jellyfin/jellyfin/releases/tag/v12.1) and [Shelfmark Lite `1.3.15`](https://github.com/calibrain/shelfmark/releases/tag/v1.3.15). It passed 17 live API checks and the regular-user web search/release flow. Preview 2's sheet-music search and title/author lookup require the matching [Moonbase Books `2.3.1.101` plugin](https://github.com/ZepiGit/Moonbase-Books/releases/tag/v2.3.1.101-books.2). Other server combinations need their own checks.
+The previous [Moonbase Books `2.3.1.100` plugin](https://github.com/ZepiGit/Moonbase-Books/releases/tag/v2.3.1.100-books.1) was deployed and tested with [Jellyfin `12.1`](https://github.com/jellyfin/jellyfin/releases/tag/v12.1) and [Shelfmark Lite `1.3.15`](https://github.com/calibrain/shelfmark/releases/tag/v1.3.15). It passed 17 live API checks and the regular-user web search/release flow. Preview 2's sheet-music search and title/author lookup require the matching [Moonbase Books `2.3.1.102` plugin](https://github.com/ZepiGit/Moonbase-Books/releases/tag/v2.3.1.102-books.2). Other server combinations need their own checks.
 
 ## Build from source
 
