@@ -1,0 +1,92 @@
+name: Publish Moonfin Books Preview 2
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful Moonfin Books build run ID
+        required: true
+        type: string
+      source_sha:
+        description: Exact app source commit built by that run
+        required: true
+        type: string
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify source and build run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          test "$SOURCE_SHA" = '735d6ce24244c5cbc771e349bdff259874615025'
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" > /tmp/run.json
+          python3 - <<'PY'
+          import json, os
+          run = json.load(open('/tmp/run.json'))
+          assert run['head_sha'] == os.environ['SOURCE_SHA']
+          assert run['status'] == 'completed' and run['conclusion'] == 'success'
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+          pattern: books-*
+          merge-multiple: true
+          path: dist
+      - name: Select and checksum 24 release packages
+        env:
+          RUN_ID: ${{ inputs.run_id }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, os
+          from pathlib import Path
+          dist = Path('dist')
+          out = Path('release')
+          out.mkdir()
+          extensions = ('.apk', '.aab', '.ipa', '.dmg', '.exe', '.AppImage',
+                        '.deb', '.rpm', '.snap', '.flatpak', '.tar.gz', '.zip')
+          files = sorted(p for p in dist.rglob('*') if p.is_file()
+                         and p.name.startswith('Moonfin_Books_')
+                         and p.name.endswith(extensions))
+          assert len(files) == 24, [p.name for p in files]
+          assert len({p.name for p in files}) == 24
+          sums = []
+          for source in files:
+              target = out / source.name
+              source.rename(target)
+              assert target.stat().st_size > 0
+              with target.open('rb') as stream:
+                  sums.append(f'{hashlib.file_digest(stream, "sha256").hexdigest()}  {target.name}')
+          (out / 'SHA256SUMS').write_text('\n'.join(sums) + '\n')
+          (out / 'SOURCE_REVISIONS.txt').write_text(
+              f"Apps: {os.environ['SOURCE_SHA']}\n"
+              f"Build run: {os.environ['RUN_ID']}\n"
+              'Matching plugin: b3df72713b7e9acd3c864d5cea0c2fbe72c2cf8a\n')
+          print('verified_packages', len(files))
+          PY
+      - name: Publish prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          tag=v2.6.0-books.2
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'Release already exists; refusing to overwrite it' >&2
+            exit 1
+          fi
+          gh release create "$tag" release/* --repo "$GITHUB_REPOSITORY" \
+            --target "$SOURCE_SHA" --prerelease \
+            --title 'Moonfin Books 2.6.0 — Preview 2' \
+            --notes-file docs/PREVIEW2_RELEASE.md
