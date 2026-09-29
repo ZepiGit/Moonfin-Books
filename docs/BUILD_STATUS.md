@@ -1,6 +1,8 @@
 # Moonfin Books build status
 
-Snapshot: **28 September 2026**. All platform build jobs and the Linux correction run succeeded. [Preview 1 downloads](https://github.com/ZepiGit/Moonfin-Books/releases/tag/v2.6.0-books.1) contain 24 package files plus checksums and source provenance. This table distinguishes build evidence from actual runtime checks. No store publication or testing on every physical device is claimed.
+Preview 2 update, **29 September 2026**: [Preview 2 downloads](https://github.com/ZepiGit/Moonfin-Books/releases/tag/v2.6.0-books.2) contain 24 platform packages plus `SHA256SUMS` and `SOURCE_REVISIONS.txt`. [Build run 36565919610](https://github.com/ZepiGit/Moonfin-Books/actions/runs/36565919610) passed its Books tests, web, Android mobile/TV, iOS/tvOS, macOS, Windows x64/ARM64 and Linux x64/ARM64 jobs. All 24 published package SHA-256 digests match the release checksum file. Packages use app source `735d6ce24244c5cbc771e349bdff259874615025` and require the matching [Moonbase Books Preview 2](https://github.com/ZepiGit/Moonbase-Books/releases/tag/v2.3.1.101-books.2). These checks do not establish complete physical-device or store acceptance.
+
+The following Preview 1 table is the **28 September 2026** snapshot. [Preview 1 downloads](https://github.com/ZepiGit/Moonfin-Books/releases/tag/v2.6.0-books.1) contain 24 package files plus checksums and source provenance. It distinguishes build evidence from actual runtime checks.
 
 | Target | Build and package evidence | Runtime evidence / remaining limits |
 | --- | --- | --- |
