@@ -72,7 +72,7 @@ jobs:
           (out / 'SOURCE_REVISIONS.txt').write_text(
               f"Apps: {os.environ['SOURCE_SHA']}\n"
               f"Build run: {os.environ['RUN_ID']}\n"
-              'Matching plugin: b3df72713b7e9acd3c864d5cea0c2fbe72c2cf8a\n')
+              'Matching plugin: 88753a4d51bf0d3b9944a58b7cc5ceede722d7d8\n')
           print('verified_packages', len(files))
           PY
       - name: Publish prerelease
