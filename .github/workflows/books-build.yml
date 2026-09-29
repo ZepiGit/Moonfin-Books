@@ -29,7 +29,7 @@ jobs:
 
         flutter test test/ui/screens/detail/detail_overflow_sections_test.dart test/ui/screens/detail/spotlight_series_detail_layout_test.dart
 
-        python3 -m unittest discover -s test/books/sheet_music -p 'test_*.py'
+        python3 -m unittest discover -s test/books/sheet_music -p test_*.py
 
         flutter test test/util/app_distribution_custom_build_test.dart --dart-define=DISTRIBUTION_CHANNEL=windows
 
