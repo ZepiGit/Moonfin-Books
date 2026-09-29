@@ -77,7 +77,7 @@ jobs:
           PY
       - name: Publish prerelease
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.MOONFIN_RELEASE_TOKEN }}
           SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
           set -euo pipefail
