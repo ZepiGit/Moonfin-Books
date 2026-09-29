@@ -144,4 +144,105 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Download started'), findsOneWidget);
   }, timeout: const Timeout(Duration(seconds: 20)));
+
+  testWidgets('release list flags uncertain hits and shows unknown metadata', (
+    tester,
+  ) async {
+    final repo = _MixedReleasesRepository();
+    const book = BookResult(
+      provider: 'openlibrary',
+      id: '1',
+      title: 'Inferno',
+      authors: ['Dante Alighieri'],
+    );
+    var calls = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: BookReleasesDialog(
+            book: book,
+            type: BooksMediaType.ebook,
+            repository: repo,
+            onStart: (book, release, type) async {
+              calls++;
+              return true;
+            },
+            onDownloads: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Format: unknown · Language: unknown'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('books-release-warning:p:match')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('books-release-warning:p:other')),
+      findsOneWidget,
+    );
+    expect(find.text('Uncertain match for this book'), findsOneWidget);
+    expect(find.text('Format does not match this media type'), findsOneWidget);
+    expect(find.text('German and English editions only'), findsOneWidget);
+    // The likely match is listed above the unrelated hit and nothing is
+    // selected or ordered without a tap.
+    expect(
+      tester.getTopLeft(find.text('Dante Alighieri - Inferno')).dy,
+      lessThan(tester.getTopLeft(find.text('Inferno (Lara Steel)')).dy),
+    );
+    expect(calls, 0);
+    await tester.tap(find.text('Inferno (Lara Steel)'));
+    await tester.pump();
+    await tester.tap(find.text('Dante Alighieri - Inferno (Italian)'));
+    await tester.pump();
+    expect(calls, 0);
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const ValueKey('books-submit')))
+          .onPressed,
+      isNull,
+    );
+  }, timeout: const Timeout(Duration(seconds: 20)));
+}
+
+class _MixedReleasesRepository extends BooksRepository {
+  _MixedReleasesRepository()
+    : super.forTest('https://jellyfin.example', 'test-token', Dio());
+
+  @override
+  Future<List<BookRelease>> releases(
+    BookResult book,
+    BooksMediaType type,
+  ) async => const [
+    BookRelease(
+      source: 'p',
+      sourceId: 'other',
+      title: 'Inferno (Lara Steel)',
+      format: 'mp3',
+      language: 'en',
+    ),
+    BookRelease(
+      source: 'p',
+      sourceId: 'match',
+      title: 'Dante Alighieri - Inferno',
+    ),
+    BookRelease(
+      source: 'p',
+      sourceId: 'foreign',
+      title: 'Dante Alighieri - Inferno (Italian)',
+      format: 'epub',
+      language: 'ita',
+    ),
+    BookRelease(
+      source: 'p',
+      sourceId: 'comic',
+      title: 'Event Horizon: Inferno #1',
+      format: 'epub',
+    ),
+  ];
 }

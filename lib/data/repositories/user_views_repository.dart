@@ -16,23 +16,25 @@ Future<List<AggregatedLibrary>> loadUserViews(
 List<AggregatedLibrary> _parseUserViews(Map<String, dynamic> response) {
   final items = response['Items'] as List? ?? [];
 
-  return items.whereType<Map>().map((item) {
-    final data = item.cast<String, dynamic>();
-    return AggregatedLibrary(
-      id: data['Id']?.toString() ?? '',
-      name: data['Name']?.toString() ?? '',
-      collectionType: data['CollectionType'] as String? ?? '',
-      serverId: data['ServerId']?.toString() ?? '',
-      primaryImageAspectRatio: (data['PrimaryImageAspectRatio'] as num?)
-          ?.toDouble(),
-      imageTags: data['ImageTags'] != null
-          ? Map<String, dynamic>.from(data['ImageTags'] as Map)
-          : null,
-      backdropImageTags: (data['BackdropImageTags'] as List?)
-          ?.map((e) => e.toString())
-          .toList(),
-    );
-  }).toList();
+  return orderMichelFlixLibraries(
+    items.whereType<Map>().map((item) {
+      final data = item.cast<String, dynamic>();
+      return AggregatedLibrary(
+        id: data['Id']?.toString() ?? '',
+        name: data['Name']?.toString() ?? '',
+        collectionType: data['CollectionType'] as String? ?? '',
+        serverId: data['ServerId']?.toString() ?? '',
+        primaryImageAspectRatio: (data['PrimaryImageAspectRatio'] as num?)
+            ?.toDouble(),
+        imageTags: data['ImageTags'] != null
+            ? Map<String, dynamic>.from(data['ImageTags'] as Map)
+            : null,
+        backdropImageTags: (data['BackdropImageTags'] as List?)
+            ?.map((e) => e.toString())
+            .toList(),
+      );
+    }).toList(),
+  );
 }
 
 /// The My Media exclude list, or null when it can't be read.
@@ -55,15 +57,32 @@ Future<Map<String, dynamic>> loadVisibleUserViews(
   final excludes = await _excludesFrom(client.usersApi.getUserConfiguration());
   final response = await viewsFuture;
 
-  if (excludes == null) return client.userViewsApi.getUserViews();
+  if (excludes == null) {
+    return _orderViewsResponse(await client.userViewsApi.getUserViews());
+  }
   return _filterExcludedViews(response, excludes);
+}
+
+Map<String, dynamic> _orderViewsResponse(Map<String, dynamic> response) {
+  final items = (response['Items'] as List? ?? []).indexed.toList();
+  items.sort((a, b) {
+    final nameA = (a.$2 as Map?)?['Name']?.toString() ?? '';
+    final nameB = (b.$2 as Map?)?['Name']?.toString() ?? '';
+    final byRank = michelFlixLibraryRank(nameA)
+        .compareTo(michelFlixLibraryRank(nameB));
+    return byRank != 0 ? byRank : a.$1.compareTo(b.$1);
+  });
+  return {
+    ...response,
+    'Items': [for (final row in items) row.$2],
+  };
 }
 
 Map<String, dynamic> _filterExcludedViews(
   Map<String, dynamic> response,
   Set<String> excludes,
 ) {
-  if (excludes.isEmpty) return response;
+  if (excludes.isEmpty) return _orderViewsResponse(response);
   final items = (response['Items'] as List? ?? [])
       .where(
         (item) => !excludes.contains(
@@ -71,7 +90,7 @@ Map<String, dynamic> _filterExcludedViews(
         ),
       )
       .toList();
-  return {...response, 'Items': items};
+  return _orderViewsResponse({...response, 'Items': items});
 }
 
 class UserViewsRepository extends ChangeNotifier {
@@ -88,9 +107,8 @@ class UserViewsRepository extends ChangeNotifier {
   UserViewsRepository(this._client);
 
   Future<List<AggregatedLibrary>> getAllViews() =>
-      _inFlightViews ??= loadUserViews(
-        _client,
-      ).whenComplete(() => _inFlightViews = null);
+      _inFlightViews ??= loadUserViews(_client)
+          .whenComplete(() => _inFlightViews = null);
 
   Future<Map<String, dynamic>> _hiddenResponse() =>
       _inFlightHiddenResponse ??= _client.userViewsApi
@@ -106,7 +124,9 @@ class UserViewsRepository extends ChangeNotifier {
     final responseFuture = _hiddenResponse();
     final excludes = await _excludesFrom(cachedUserConfiguration());
     final response = await responseFuture;
-    if (excludes == null) return _client.userViewsApi.getUserViews();
+    if (excludes == null) {
+      return _orderViewsResponse(await _client.userViewsApi.getUserViews());
+    }
     return _filterExcludedViews(response, excludes);
   }
 

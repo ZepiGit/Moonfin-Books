@@ -1,6 +1,8 @@
 # Moonfin Books
 
-Moonfin Books is a fork of [Moonfin-Client/Moonfin-Core](https://github.com/Moonfin-Client/Moonfin-Core). It adds a Books request page to Moonfin's Flutter client. Users search for ebooks or audiobooks, choose a release, submit it, and see their own download status inside the app. The page uses the current Jellyfin sign-in and the user's configured server URL; it does not ask for a second Shelfmark login.
+This repository is my personal adaptation of the official Moonfin app for my own setup. It is not an official upstream release. Anyone who wants the same features is welcome to use this fork under its existing license.
+
+Moonfin Books is a fork of [Moonfin-Client/Moonfin-Core](https://github.com/Moonfin-Client/Moonfin-Core). It adds in-app ebook and audiobook requests, improved title/author search, and sheet-music search with automatic requests, import status, in-app reading and file download. The series and anime detail view shows multiple seasons directly and moves cast, crew, studios and recommendations into More Actions. Users search for ebooks or audiobooks, choose a release, submit it, and see their own download status inside the app. The page uses the current Jellyfin sign-in and the user's configured server URL; it does not ask for a second Shelfmark login.
 
 This feature requires the matching Jellyfin plugin from [Moonbase Books](https://github.com/ZepiGit/Moonbase-Books). The Books entry appears when plugin settings sync is enabled and its authenticated `Ping` response reports `booksEnabled: true`.
 
@@ -37,7 +39,7 @@ The Linux screenshot shows Books search in the released x64 tar package, running
 ## Get started
 
 1. Ask your server administrator to follow [Moonbase Books server setup](https://github.com/ZepiGit/Moonbase-Books/blob/master/docs/SERVER_SETUP.md). End users only install a client and sign in; they do not configure Shelfmark, indexers, or downloader credentials.
-2. Download [Moonfin Books Preview 1](https://github.com/ZepiGit/Moonfin-Books/releases/tag/v2.6.0-books.1), choose the package for your device, verify its checksum, and follow the [platform installation guide](docs/INSTALL.md). Read [build status](docs/BUILD_STATUS.md) for signing and runtime-test limits. iOS/tvOS IPAs require Apple signing before installation.
+2. Download [Moonfin Books Preview 2](https://github.com/ZepiGit/Moonfin-Books/releases/tag/v2.6.0-books.2), choose the package for your device, verify its checksum, and follow the [platform installation guide](docs/INSTALL.md). Read [build status](docs/BUILD_STATUS.md) for signing and runtime-test limits. iOS/tvOS IPAs require Apple signing before installation.
 3. Open Moonfin Books, enter your existing Jellyfin server URL, and sign in with your Jellyfin account. Open **Books** to search ebooks or audiobooks. If the entry is absent, the administrator should check the matching plugin and its Books/Settings Sync settings.
 
 The fork is intended to use separate app and installer identities so it can coexist with official Moonfin. Its local settings and downloads are separate; sign in again and do not assume local data is migrated. Web users open the plugin-served `/Moonfin/Web/` URL and do not install a native package.
@@ -46,7 +48,7 @@ The fork is intended to use separate app and installer identities so it can coex
 
 See [Build status](docs/BUILD_STATUS.md) for the current package and signing evidence. The fork targets the upstream platform set: Android mobile and TV/Fire TV, iOS, tvOS, macOS, Windows x64/ARM64, Linux x64/ARM64, and web. A target in the source tree does not mean a Moonfin Books package has passed device testing or been published.
 
-The released [Moonbase Books `2.3.1.100` plugin](https://github.com/ZepiGit/Moonbase-Books/releases/tag/v2.3.1.100-books.1) was deployed and tested with [Jellyfin `12.1`](https://github.com/jellyfin/jellyfin/releases/tag/v12.1) and [Shelfmark Lite `1.3.15`](https://github.com/calibrain/shelfmark/releases/tag/v1.3.15). It passed 17 live API checks and the regular-user web search/release flow. Other server combinations need their own checks.
+The previous [Moonbase Books `2.3.1.100` plugin](https://github.com/ZepiGit/Moonbase-Books/releases/tag/v2.3.1.100-books.1) was deployed and tested with [Jellyfin `12.1`](https://github.com/jellyfin/jellyfin/releases/tag/v12.1) and [Shelfmark Lite `1.3.15`](https://github.com/calibrain/shelfmark/releases/tag/v1.3.15). It passed 17 live API checks and the regular-user web search/release flow. Preview 2's sheet-music search and title/author lookup require the matching [Moonbase Books `2.3.1.101` plugin](https://github.com/ZepiGit/Moonbase-Books/releases/tag/v2.3.1.101-books.2). Other server combinations need their own checks.
 
 ## Build from source
 

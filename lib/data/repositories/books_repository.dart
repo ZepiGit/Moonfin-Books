@@ -98,20 +98,60 @@ class BooksRepository {
     String query,
     BooksMediaType type, {
     int page = 1,
+    String? author,
   }) async {
+    final byAuthor = author != null && author.trim().isNotEmpty;
+    final text = query.trim();
     final data = _map(
       (await _request(
         'Search',
         query: {
-          'query': query,
+          // A targeted search sends title/author fields and no free text,
+          // because Shelfmark would otherwise add the text as an extra `q`.
+          if (byAuthor) ...{
+            if (text.isNotEmpty) 'title': _limit(text, 300),
+            'author': _limit(author.trim(), 300),
+          } else
+            'query': query,
           'content_type': type.wire,
           'page': page,
           'limit': 40,
         },
       )).data,
     );
+    final books = _list(data['books']).map(BookResult.fromJson).toList();
+    final wantedTitle = _tokens(query).join(' ');
+    if (wantedTitle.isNotEmpty) {
+      final indexed = books.indexed.toList();
+      int score(BookResult book) {
+        final title = _tokens(book.title).join(' ');
+        final titleScore = title == wantedTitle
+            ? 100
+            : title.startsWith('$wantedTitle ')
+            ? 50
+            : title.contains(wantedTitle)
+            ? 20
+            : 0;
+        final language = book.language?.toLowerCase().trim();
+        final languageScore =
+            const {'de', 'deu', 'ger', 'german'}.contains(language)
+            ? 8
+            : const {'en', 'eng', 'english'}.contains(language)
+            ? 2
+            : 0;
+        return titleScore + languageScore;
+      }
+
+      indexed.sort((a, b) {
+        final comparison = score(b.$2).compareTo(score(a.$2));
+        return comparison != 0 ? comparison : a.$1.compareTo(b.$1);
+      });
+      books
+        ..clear()
+        ..addAll(indexed.map((row) => row.$2));
+    }
     return BooksSearchPage(
-      books: _list(data['books']).map(BookResult.fromJson).toList(),
+      books: books,
       hasMore: data['has_more'] == true,
       page: (data['page'] as num?)?.toInt() ?? page,
     );
@@ -127,6 +167,11 @@ class BooksRepository {
       'book_id': book.id,
       'content_type': type.wire,
       'title': book.title,
+      'languages': 'de,en',
+      // Shelfmark uses author for manual/source searches; metadata providers
+      // resolve their own authors from book_id. Keep the field for those paths.
+      if (book.authors.isNotEmpty)
+        'author': _limit(book.authors.join(', '), 300),
     };
     String? jobId;
     while (true) {
@@ -239,6 +284,8 @@ List<Map<String, dynamic>> _list(dynamic value) => value is List
     : <Map<String, dynamic>>[];
 String? _string(dynamic value) =>
     value is String && value.trim().isNotEmpty ? value : null;
+String _limit(String value, int max) =>
+    value.length <= max ? value : value.substring(0, max);
 
 class BooksSearchPage {
   const BooksSearchPage({
@@ -259,6 +306,7 @@ class BookResult {
     required this.authors,
     this.year,
     this.coverUrl,
+    this.language,
   });
   final String provider;
   final String id;
@@ -266,6 +314,8 @@ class BookResult {
   final List<String> authors;
   final int? year;
   final String? coverUrl;
+  final String? language;
+
   factory BookResult.fromJson(Map<String, dynamic> json) => BookResult(
     provider: _string(json['provider']) ?? '',
     id: _string(json['provider_id']) ?? '',
@@ -275,6 +325,7 @@ class BookResult {
         : const [],
     year: (json['publish_year'] as num?)?.toInt(),
     coverUrl: _publicCoverUrl(json['cover_url']),
+    language: _string(json['language']),
   );
 }
 
@@ -378,4 +429,225 @@ class BookDownload {
   final String title;
   final String status;
   final double? progress;
+}
+
+/// How well a release fits the requested work. Nothing here starts a download;
+/// the result only orders and labels the list the user chooses from.
+class BookReleaseAssessment {
+  const BookReleaseAssessment({
+    required this.release,
+    required this.titleMatches,
+    required this.authorMatches,
+    required this.formatMismatch,
+    required this.languageMismatch,
+    required this.likely,
+  });
+  final BookRelease release;
+  final bool titleMatches;
+  final bool authorMatches;
+  final bool formatMismatch;
+  final bool languageMismatch;
+  final bool likely;
+}
+
+/// Orders matching works first, then compatible German/English editions.
+/// The metadata record's own language is deliberately not a reader preference.
+List<BookReleaseAssessment> assessReleases(
+  BookResult book,
+  List<BookRelease> releases,
+  BooksMediaType type,
+) {
+  final titleTokens = _significantTokens(book.title);
+  final authors = book.authors
+      .map((author) => _tokens(author).toList())
+      .where((tokens) => tokens.isNotEmpty)
+      .toList();
+
+  final indexed = <(int, BookReleaseAssessment)>[];
+  for (final (index, release) in releases.indexed) {
+    final tokens = _tokens(release.title).toSet();
+    final titleMatches =
+        titleTokens.isNotEmpty && titleTokens.every(tokens.contains);
+    final authorMatches =
+        authors.isEmpty ||
+        authors.any(
+          (name) => tokens.contains(name.last) || name.every(tokens.contains),
+        );
+    final format = release.format?.trim().toLowerCase();
+    final formatMismatch = type == BooksMediaType.ebook
+        ? _audiobookFormats.contains(format) && !_ebookFormats.contains(format)
+        : _ebookFormats.contains(format) && !_audiobookFormats.contains(format);
+    final languageMismatch = _outsideBookLanguages(release.language);
+    final likely =
+        titleMatches && authorMatches && !formatMismatch && !languageMismatch;
+    indexed.add((
+      index,
+      BookReleaseAssessment(
+        release: release,
+        titleMatches: titleMatches,
+        authorMatches: authorMatches,
+        formatMismatch: formatMismatch,
+        languageMismatch: languageMismatch,
+        likely: likely,
+      ),
+    ));
+  }
+  int workRank(BookReleaseAssessment item) => !item.titleMatches
+      ? 2
+      : item.authorMatches
+      ? 0
+      : 1;
+  int compatibilityRank(BookReleaseAssessment item) => item.formatMismatch
+      ? 2
+      : item.languageMismatch
+      ? 1
+      : 0;
+  indexed.sort((a, b) {
+    final byWork = workRank(a.$2).compareTo(workRank(b.$2));
+    if (byWork != 0) return byWork;
+    final byCompatibility = compatibilityRank(a.$2)
+        .compareTo(compatibilityRank(b.$2));
+    return byCompatibility != 0 ? byCompatibility : a.$1.compareTo(b.$1);
+  });
+  return [for (final item in indexed) item.$2];
+}
+
+const _ebookFormats = {
+  'epub',
+  'mobi',
+  'azw3',
+  'pdf',
+  'fb2',
+  'djvu',
+  'cbz',
+  'cbr',
+  'txt',
+  'rtf',
+  'doc',
+  'docx',
+  'zip',
+  'rar',
+};
+const _audiobookFormats = {
+  'm4b',
+  'mp3',
+  'm4a',
+  'mp4',
+  'flac',
+  'ogg',
+  'wma',
+  'aac',
+  'wav',
+  'opus',
+  'zip',
+  'rar',
+};
+
+const _germanLanguageNames = {'de', 'deu', 'ger', 'german', 'deutsch'};
+const _englishLanguageNames = {'en', 'eng', 'english'};
+const _otherLanguageNames = {
+  'french',
+  'français',
+  'spanish',
+  'español',
+  'italian',
+  'italiano',
+  'japanese',
+  'chinese',
+  'russian',
+  'portuguese',
+  'dutch',
+  'latin',
+};
+final _languageCode = RegExp(r'^[a-z]{2,3}$');
+
+bool _outsideBookLanguages(String? value) {
+  if (value == null) return false;
+  final parts = value
+      .toLowerCase()
+      .split(RegExp(r'[^a-zà-ÿ]+'))
+      .where((part) => part.isNotEmpty)
+      .toList();
+  if (parts.isEmpty ||
+      parts.any(
+        (part) =>
+            _germanLanguageNames.contains(part) ||
+            _englishLanguageNames.contains(part),
+      )) {
+    return false;
+  }
+  // Unknown labels stay selectable for manual judgment; only clear other
+  // languages are excluded from the requested German/English scope.
+  return parts.every(
+    (part) =>
+        _languageCode.hasMatch(part) || _otherLanguageNames.contains(part),
+  );
+}
+
+const _titleStopwords = {
+  'the',
+  'a',
+  'an',
+  'of',
+  'and',
+  'novel',
+  'der',
+  'die',
+  'das',
+  'ein',
+  'eine',
+  'und',
+  'le',
+  'la',
+  'les',
+  'il',
+  'el',
+  'de',
+  'di',
+  'von',
+};
+const _foldedLetters = {
+  'ä': 'a',
+  'à': 'a',
+  'á': 'a',
+  'â': 'a',
+  'å': 'a',
+  'æ': 'ae',
+  'ç': 'c',
+  'é': 'e',
+  'è': 'e',
+  'ê': 'e',
+  'ë': 'e',
+  'í': 'i',
+  'ì': 'i',
+  'î': 'i',
+  'ï': 'i',
+  'ñ': 'n',
+  'ö': 'o',
+  'ó': 'o',
+  'ò': 'o',
+  'ô': 'o',
+  'ø': 'o',
+  'œ': 'oe',
+  'ß': 'ss',
+  'ü': 'u',
+  'ú': 'u',
+  'ù': 'u',
+  'û': 'u',
+};
+final _tokenSeparator = RegExp(r'[^\p{L}\p{N}]+', unicode: true);
+
+Iterable<String> _tokens(String value) => value
+    .toLowerCase()
+    .replaceAll(RegExp(r"['’]"), '')
+    .split('')
+    .map((char) => _foldedLetters[char] ?? char)
+    .join()
+    .split(_tokenSeparator)
+    .where((token) => token.isNotEmpty);
+
+List<String> _significantTokens(String title) {
+  final all = _tokens(title.split(':').first).toList();
+  final significant = all.where((t) => !_titleStopwords.contains(t)).toList();
+  return significant.isEmpty ? all : significant;
 }

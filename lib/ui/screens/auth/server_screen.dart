@@ -91,10 +91,17 @@ class _ServerScreenState extends State<ServerScreen> {
       }
 
       if (!mounted) return;
+      final allUsers = merged.values.toList();
+      final focusIndex =
+          Uri.tryParse(server.address)?.host.toLowerCase() ==
+              'watch.tiedemann.art'
+          ? allUsers.indexWhere(
+              (user) => user.name.trim().toLowerCase() != 'kids',
+            )
+          : 0;
       for (final node in _userFocusNodes) {
         node.dispose();
       }
-      final allUsers = merged.values.toList();
       _userFocusNodes
         ..clear()
         ..addAll(List.generate(allUsers.length, (_) => FocusNode()));
@@ -106,10 +113,10 @@ class _ServerScreenState extends State<ServerScreen> {
         _errorMessage = null;
       });
 
-      if (allUsers.isNotEmpty) {
+      if (focusIndex >= 0 && allUsers.isNotEmpty) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && _userFocusNodes.isNotEmpty) {
-            _userFocusNodes[0].requestFocus();
+            _userFocusNodes[focusIndex].requestFocus();
           }
         });
       }
@@ -254,25 +261,22 @@ class _ServerScreenState extends State<ServerScreen> {
         children: [
           Text(
             server.name,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Colors.white.withValues(alpha: 0.5),
-            ),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: Colors.white.withValues(alpha: 0.5)),
           ),
           const SizedBox(height: 16),
           Text(
             l10n.whosWatching,
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+            style: Theme.of(context).textTheme.headlineSmall
+                ?.copyWith(fontWeight: FontWeight.bold),
           ),
           if (server.loginDisclaimer != null &&
               server.loginDisclaimer!.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
               server.loginDisclaimer!,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.white.withValues(alpha: 0.7),
-              ),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: Colors.white.withValues(alpha: 0.7)),
               textAlign: TextAlign.center,
             ),
           ],

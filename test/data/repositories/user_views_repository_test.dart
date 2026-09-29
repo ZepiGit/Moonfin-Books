@@ -52,9 +52,8 @@ void main() {
   });
 
   test('the raw and parsed views share one request', () async {
-    when(
-      () => users.getUserConfiguration(),
-    ).thenAnswer((_) => later(const UserConfiguration()));
+    when(() => users.getUserConfiguration())
+        .thenAnswer((_) => later(const UserConfiguration()));
     when(() => views.getUserViews(includeHidden: true)).thenAnswer(
       (_) => later({
         'Items': [
@@ -71,11 +70,38 @@ void main() {
   });
 
   test(
+    'raw My Media rows use MichelFlix order after hidden views are removed',
+    () async {
+      when(() => users.getUserConfiguration()).thenAnswer(
+        (_) async => const UserConfiguration(myMediaExcludes: ['hidden']),
+      );
+      when(() => views.getUserViews(includeHidden: true)).thenAnswer(
+        (_) async => {
+          'Items': [
+            {'Id': 'kids', 'Name': 'Serien Kids'},
+            {'Id': 'audio', 'Name': 'Hörbücher'},
+            {'Id': 'hidden', 'Name': 'Hidden'},
+            {'Id': 'movies', 'Name': 'Filme'},
+            {'Id': 'scores', 'Name': 'Noten'},
+          ],
+        },
+      );
+
+      final rows = (await repo.getVisibleViewsResponse())['Items'] as List;
+      expect(rows.map((row) => row['Name']), [
+        'Filme',
+        'Hörbücher',
+        'Noten',
+        'Serien Kids',
+      ]);
+    },
+  );
+
+  test(
     'a forced configuration read still collapses while one is in flight',
     () async {
-      when(
-        () => users.getUserConfiguration(),
-      ).thenAnswer((_) => later(const UserConfiguration()));
+      when(() => users.getUserConfiguration())
+          .thenAnswer((_) => later(const UserConfiguration()));
 
       await Future.wait([
         repo.getUserConfiguration(),

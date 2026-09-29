@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get_it/get_it.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moonfin_design/moonfin_design.dart';
@@ -19,6 +20,7 @@ import '../../../../preference/detail_metadata_layout.dart';
 import '../../../../preference/preference_constants.dart';
 import '../../../../preference/user_preferences.dart';
 import '../upcoming_episode_badge.dart';
+import '../../../../util/focus/dpad_keys.dart';
 import '../../../../util/overview_text.dart';
 import '../../../../util/seerr_credits.dart';
 import '../../../../util/platform_detection.dart';
@@ -38,6 +40,8 @@ import '../detail_layout_metrics.dart';
 import '../item_detail_screen.dart'
     show
         DetailActionButtons,
+        DetailInlineSeasonsSection,
+        DetailOverflowSection,
         ExpandableBiography,
         PersonDates,
         selectedMediaSourceForItem,
@@ -48,6 +52,35 @@ import 'spotlight_landscape_layout.dart';
 import 'spotlight_portrait_layout.dart';
 import 'widgets/spotlight_section_modal.dart';
 import 'widgets/spotlight_summary_card.dart';
+
+/// The summary card that holds a series' seasons, and the ones whose content a
+/// series page moved behind the More Actions menu.
+const String spotlightSeasonsCardId = 'seasons';
+const List<String> spotlightRelocatedCardIds = <String>['people', 'similar'];
+
+/// The summary cards a series keeps on the detail screen itself.
+///
+/// The cast, crew, studios and recommendation cards move off the page into a
+/// single nested entry in the More Actions menu, so a series page spends its
+/// card band on what identifies the title instead of on who made it and what
+/// to watch next. The season card is the third that moves: past one season
+/// there is a choice to make, and the seasons are laid out on the page rather
+/// than behind a teaser that counts them. A series with a single season keeps
+/// its teaser, because there is nothing to choose between.
+///
+/// Every other item type keeps the cards it has always had.
+List<String> spotlightVisibleCardIds({
+  required String itemType,
+  required int seasonCount,
+  required List<String> cardIds,
+}) {
+  if (itemType != 'Series') return List.unmodifiable(cardIds);
+  final hidden = <String>{
+    ...spotlightRelocatedCardIds,
+    if (seasonCount > 1) spotlightSeasonsCardId,
+  };
+  return List.unmodifiable(cardIds.where((id) => !hidden.contains(id)));
+}
 
 /// "Spotlight" detail-screen style: a hero-first layout with Play plus at most
 /// three action buttons (the rest behind an ellipsis menu, ordered by the
@@ -98,6 +131,10 @@ class _SpotlightDetailContentState extends State<SpotlightDetailContent> {
   bool _modalOpen = false;
   final _scrollController = ScrollController();
   final _overviewFocusNode = FocusNode(debugLabel: 'SpotlightOverview');
+
+  /// The first season of the inline strip, and so the stop between the action
+  /// row and the summary cards.
+  final _seasonsFirstFocusNode = FocusNode(debugLabel: 'SpotlightSeasonsFirst');
   final _cardFocusNodes = <String, FocusNode>{};
   final _trackFocusNodes = <String, FocusNode>{};
 
@@ -147,8 +184,9 @@ class _SpotlightDetailContentState extends State<SpotlightDetailContent> {
     }
 
     final localCandidates = collectPersonLocalBackdrops(_vm);
-    final appearancesCandidates =
-        collectPersonSeerrBackdrops(_seerrAppearances);
+    final appearancesCandidates = collectPersonSeerrBackdrops(
+      _seerrAppearances,
+    );
     final crewCandidates = collectPersonSeerrBackdrops(_seerrCrewCredits);
     final allCandidates = [
       ...localCandidates,
@@ -161,7 +199,9 @@ class _SpotlightDetailContentState extends State<SpotlightDetailContent> {
     final rng = math.Random();
     final String? mainUrl;
     final String? mainKey;
-    if (!isNewPerson && _personBackdropUrl != null && _personBackdropKey != null) {
+    if (!isNewPerson &&
+        _personBackdropUrl != null &&
+        _personBackdropKey != null) {
       mainUrl = _personBackdropUrl;
       mainKey = _personBackdropKey;
     } else {
@@ -268,6 +308,7 @@ class _SpotlightDetailContentState extends State<SpotlightDetailContent> {
     _vm.removeListener(_onViewModelChanged);
     _scrollController.dispose();
     _overviewFocusNode.dispose();
+    _seasonsFirstFocusNode.dispose();
     for (final node in _cardFocusNodes.values) {
       node.dispose();
     }
@@ -353,7 +394,8 @@ class _SpotlightDetailContentState extends State<SpotlightDetailContent> {
     return SpotlightCardActions(
       openItem: (entry) => _closeModalThen(() {
         if (entry.serverId == 'seerr') {
-          final mediaType = entry.seerrMediaType ??
+          final mediaType =
+              entry.seerrMediaType ??
               (entry.type == 'Series' || entry.type == 'tv' ? 'tv' : 'movie');
           final tmdbId = entry.tmdbId;
           final targetId = (tmdbId != null && tmdbId.isNotEmpty)
@@ -405,7 +447,8 @@ class _SpotlightDetailContentState extends State<SpotlightDetailContent> {
       playFromChapter: (position) =>
           _closeModalThen(() => widget.onPlayFromChapter?.call(position)),
       playExtra: (extra) => _closeModalThen(() => _playItems([extra], 0)),
-      playTrack: (index) => _closeModalThen(() => _playItems(_vm.tracks, index)),
+      playTrack: (index) =>
+          _closeModalThen(() => _playItems(_vm.tracks, index)),
       playPlaylistTrack: (index) =>
           _closeModalThen(() => _playItems(_vm.playlistItems, index)),
       trackFocusNode: (id) =>
@@ -697,14 +740,16 @@ class _SpotlightDetailContentState extends State<SpotlightDetailContent> {
                         maxWidth: seriesLogoWidth,
                       )
                     : (item.seriesName != null
-                        ? Text(
-                            item.seriesName!,
-                            style: textTheme.labelLarge?.copyWith(
-                              color: AppColorScheme.onSurface.withValues(alpha: 0.7),
-                              letterSpacing: 1.2,
-                            ),
-                          )
-                        : const SizedBox.shrink()),
+                          ? Text(
+                              item.seriesName!,
+                              style: textTheme.labelLarge?.copyWith(
+                                color: AppColorScheme.onSurface.withValues(
+                                  alpha: 0.7,
+                                ),
+                                letterSpacing: 1.2,
+                              ),
+                            )
+                          : const SizedBox.shrink()),
               ),
             ),
           ),
@@ -773,7 +818,9 @@ class _SpotlightDetailContentState extends State<SpotlightDetailContent> {
             if (s != null && e != null) addText('S$s:E$e');
           }
           final runtime = item.runtime;
-          if (runtime != null && runtime > Duration.zero && item.type != 'Series') {
+          if (runtime != null &&
+              runtime > Duration.zero &&
+              item.type != 'Series') {
             pieces.add(
               Row(
                 mainAxisSize: MainAxisSize.min,
@@ -793,7 +840,9 @@ class _SpotlightDetailContentState extends State<SpotlightDetailContent> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: isEnded ? const Color(0xFFB71C1C) : const Color(0xFF2E7D32),
+                  color: isEnded
+                      ? const Color(0xFFB71C1C)
+                      : const Color(0xFF2E7D32),
                   borderRadius: JellyfinTokens.shapes.smallRadius,
                 ),
                 child: Text(
@@ -822,7 +871,9 @@ class _SpotlightDetailContentState extends State<SpotlightDetailContent> {
         case DetailMetadataItem.seerrAvailability:
           final seerrStatus = seerrItemStatus(_vm);
           if (seerrStatus != null) {
-            pieces.add(SeerrStatusPills(state: seerrStatus, onlyNoteworthy: true));
+            pieces.add(
+              SeerrStatusPills(state: seerrStatus, onlyNoteworthy: true),
+            );
           }
       }
     }
@@ -901,9 +952,7 @@ class _SpotlightDetailContentState extends State<SpotlightDetailContent> {
 
   Widget _buildOverview(BuildContext context, String overview) {
     return ConstrainedBox(
-      constraints: BoxConstraints(
-        maxWidth: _landscape ? 800 : double.infinity,
-      ),
+      constraints: BoxConstraints(maxWidth: _landscape ? 800 : double.infinity),
       child: ExpandableBiography(
         text: overview,
         toggleFocusNode: _overviewFocusNode,
@@ -979,13 +1028,191 @@ class _SpotlightDetailContentState extends State<SpotlightDetailContent> {
   }
 
   // ---------------------------------------------------------------------------
+  // Seasons on the page
+
+  /// Whether this item is a series with more than one season, which is when
+  /// the seasons become a choice laid out on the page instead of a teaser.
+  /// Anime arrives here as an ordinary series.
+  bool _showsInlineSeasons(AggregatedItem item) =>
+      item.type == 'Series' && _vm.seasons.length > 1;
+
+  /// The season strip that sits under the action row. Sized by the layout it
+  /// lives in: the hero column has to leave room for the summary cards below
+  /// it, and a TV screen never scrolls this page.
+  Widget? _buildInlineSeasons(BuildContext context, AggregatedItem item) {
+    if (!_showsInlineSeasons(item)) return null;
+    final cellWidth = _landscape ? 92.0 : 108.0;
+    return Padding(
+      padding: EdgeInsets.only(top: 20 / _desktopScale),
+      child: DetailInlineSeasonsSection(
+        seasons: _vm.seasons,
+        imageApi: _vm.imageApi,
+        prefs: widget.prefs,
+        seerrSeasonStatus: seerrItemSeasonStatus(_vm),
+        firstItemFocusNode: _seasonsFirstFocusNode,
+        // Leave room for the title/progress labels below each 2:3 poster.
+        height: cellWidth * 1.5 + 90,
+        cellWidth: cellWidth,
+        onItemKeyEvent: (index, event) =>
+            _onSeasonKeyEvent(index, event, cardCount: _vm.seasons.length),
+      ),
+    );
+  }
+
+  /// The strip is one stop in the page's vertical chain: the action row above
+  /// it, the summary cards below. Left at the first poster leaves the page for
+  /// the navbar, the way every other row on this screen does.
+  KeyEventResult _onSeasonKeyEvent(
+    int index,
+    KeyEvent event, {
+    required int cardCount,
+  }) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final key = event.logicalKey;
+    if (key.isUpKey) {
+      if (index != 0) return KeyEventResult.ignored;
+      return _focusUp(widget.initialFocusNode);
+    }
+    if (key.isDownKey) {
+      final cards = _cardFocusNodes.values;
+      return _focusDown(cards.isEmpty ? null : cards.first);
+    }
+    if (key.isLeftKey && index == 0) {
+      return _focusSidebar();
+    }
+    // Right walks the row, which the posters already do between themselves.
+    return KeyEventResult.ignored;
+  }
+
+  KeyEventResult _focusUp(FocusNode? target) {
+    if (target == null) return KeyEventResult.ignored;
+    target.requestFocus();
+    return KeyEventResult.handled;
+  }
+
+  KeyEventResult _focusDown(FocusNode? target) {
+    if (target == null) return KeyEventResult.ignored;
+    target.requestFocus();
+    return KeyEventResult.handled;
+  }
+
+  KeyEventResult _focusSidebar() {
+    if (NavigationLayout.focusNavbarNotifier.value == null) {
+      return KeyEventResult.ignored;
+    }
+    NavigationLayout.focusNavbarNotifier.value!.call();
+    return KeyEventResult.handled;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Content behind More Actions
+
+  /// The single nested entry in the More Actions menu that holds a series'
+  /// cast, crew, studios and recommendations. Null when the series has none of
+  /// them, so the menu never offers a row that opens an empty screen.
+  DetailOverflowSection? _overflowSection(
+    BuildContext context,
+    AggregatedItem item,
+    List<SpotlightCardSpec> allCards,
+  ) {
+    if (item.type != 'Series') return null;
+    final sections = _relocatedSections(allCards);
+    if (sections.isEmpty) return null;
+    final l10n = AppLocalizations.of(context);
+    final name = item.name.trim();
+    return DetailOverflowSection(
+      label: l10n.details,
+      icon: Icons.people_outline,
+      onOpen: (context, returnFocus) =>
+          _openRelocatedSections(context, item, name, returnFocus),
+    );
+  }
+
+  /// The relocated cards' sections, in the order the cards would have run in.
+  List<SpotlightModalSection> _relocatedSections(
+    List<SpotlightCardSpec> allCards,
+  ) => [
+    for (final card in allCards)
+      if (spotlightRelocatedCardIds.contains(card.id)) ...card.sections,
+  ];
+
+  /// The same sections re-derived from the view model, one card at a time so
+  /// a refresh doesn't redo the whole set.
+  List<SpotlightModalSection> _liveRelocatedSections(
+    BuildContext context,
+    AggregatedItem item,
+  ) => [
+    for (final id in spotlightRelocatedCardIds)
+      if (spotlightCardFor(
+            id: id,
+            vm: _vm,
+            item: item,
+            prefs: widget.prefs,
+            l10n: AppLocalizations.of(context),
+            tmdbStudios: _tmdbStudios,
+            actions: _cardActions(item),
+            seerrAppearances: _seerrAppearances,
+            seerrCrewCredits: _seerrCrewCredits,
+            fallbackImageUrl: _cardFallbackImageUrl(item),
+            mainBackdropKey: _personBackdropKey,
+            seerrAvailable: _seerrAvailable,
+            personCardBackdrops: _personCardBackdrops,
+          )
+          case final card?)
+        ...card.sections,
+  ];
+
+  /// Opens the relocated content as one sectioned screen. It re-derives its
+  /// own sections while open, because the Seerr lookups land after the page
+  /// has already drawn and would otherwise leave it short a row.
+  Future<void> _openRelocatedSections(
+    BuildContext context,
+    AggregatedItem item,
+    String name,
+    FocusNode? returnFocus,
+  ) async {
+    if (_modalOpen || !mounted) return;
+    _modalOpen = true;
+    try {
+      final l10n = AppLocalizations.of(context);
+      final title = name.isNotEmpty ? name : l10n.details;
+      final opened = _relocatedSections(_currentCards(context, item));
+      await SpotlightSectionModal.show<VoidCallback>(
+        context,
+        title: title,
+        icon: Icons.people_outline,
+        sections: opened,
+        returnFocus: returnFocus,
+        refreshOn: _vm,
+        refresh: () {
+          final current = _vm.item;
+          if (current == null || !mounted) {
+            return (title: title, icon: Icons.people_outline, sections: opened);
+          }
+          return (
+            title: title,
+            icon: Icons.people_outline,
+            sections: _liveRelocatedSections(context, current),
+          );
+        },
+      );
+    } finally {
+      _modalOpen = false;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Assembly
 
   Widget _buildHero(
     BuildContext context,
     AggregatedItem item,
-    List<SpotlightCardSpec> cards,
-  ) {
+    List<SpotlightCardSpec> cards, {
+    required FocusNode? seasonsNode,
+    required List<DetailOverflowSection> overflowSections,
+  }) {
     final overview = cleanOverview(item.overview?.trim());
     final isPerson = item.type == 'Person';
     final selectedSource = selectedMediaSourceForItem(
@@ -993,7 +1220,8 @@ class _SpotlightDetailContentState extends State<SpotlightDetailContent> {
       widget.selectedMediaSourceId,
     );
     final showTech =
-        !isPerson && widget.prefs.get(UserPreferences.detailShowTechnicalDetails);
+        !isPerson &&
+        widget.prefs.get(UserPreferences.detailShowTechnicalDetails);
     final techRow = showTech
         ? _buildTechnicalDetailsRow(context, item, selectedSource)
         : null;
@@ -1045,7 +1273,14 @@ class _SpotlightDetailContentState extends State<SpotlightDetailContent> {
           _buildOverview(context, overview),
         ],
         const SizedBox(height: 16),
-        _buildActions(context, item, cards),
+        _buildActions(
+          context,
+          item,
+          cards,
+          seasonsNode: seasonsNode,
+          overflowSections: overflowSections,
+        ),
+        if (_buildInlineSeasons(context, item) case final seasons?) seasons,
       ],
     );
   }
@@ -1053,8 +1288,10 @@ class _SpotlightDetailContentState extends State<SpotlightDetailContent> {
   Widget _buildActions(
     BuildContext context,
     AggregatedItem item,
-    List<SpotlightCardSpec> cards,
-  ) {
+    List<SpotlightCardSpec> cards, {
+    required FocusNode? seasonsNode,
+    required List<DetailOverflowSection> overflowSections,
+  }) {
     final firstCardNode = cards.isNotEmpty
         ? _cardFocusNodes[cards.first.id]
         : null;
@@ -1079,7 +1316,8 @@ class _SpotlightDetailContentState extends State<SpotlightDetailContent> {
       onSelectedMediaSourceChanged: widget.onSelectedMediaSourceChanged,
       tvPlayFocusNode: widget.initialFocusNode,
       upTarget: _overviewFocusNode,
-      downTarget: firstCardNode,
+      downTarget: seasonsNode ?? firstCardNode,
+      overflowSections: overflowSections,
       autoPlay: widget.autoPlay,
       modernStyle: true,
       fullWidthPrimary: !_landscape,
@@ -1133,7 +1371,11 @@ class _SpotlightDetailContentState extends State<SpotlightDetailContent> {
     );
   }
 
-  Widget _buildCards(BuildContext context, List<SpotlightCardSpec> cards) {
+  Widget _buildCards(
+    BuildContext context,
+    List<SpotlightCardSpec> cards, {
+    required FocusNode? upTarget,
+  }) {
     if (cards.isEmpty) return const SizedBox.shrink();
     // Taller cards show more of the artwork through the scrim. The landscape
     // band is capped against screen height because TV never scrolls this
@@ -1153,7 +1395,7 @@ class _SpotlightDetailContentState extends State<SpotlightDetailContent> {
       compact: !_landscape,
       focusNode: _cardFocusNodes[cards[i].id],
       onOpen: () => _openCard(cards[i]),
-      onNavigateUp: () => widget.initialFocusNode?.requestFocus(),
+      onNavigateUp: () => upTarget?.requestFocus(),
     );
 
     final Widget band;
@@ -1230,15 +1472,41 @@ class _SpotlightDetailContentState extends State<SpotlightDetailContent> {
         final currentItem = _vm.item;
         if (currentItem == null) return const SizedBox.shrink();
 
-        final cardSpecs = _currentCards(context, currentItem);
+        final allCards = _currentCards(context, currentItem);
+        final visibleIds = spotlightVisibleCardIds(
+          itemType: currentItem.type ?? '',
+          seasonCount: _vm.seasons.length,
+          cardIds: [for (final card in allCards) card.id],
+        );
+        final cardSpecs = [
+          for (final card in allCards)
+            if (visibleIds.contains(card.id)) card,
+        ];
+        final overflowSection = _overflowSection(
+          context,
+          currentItem,
+          allCards,
+        );
+        // The strip sits between the action row and the cards, so it is where
+        // focus enters the page from the top and where it lands from below.
+        final seasonsNode = _showsInlineSeasons(currentItem)
+            ? _seasonsFirstFocusNode
+            : null;
+        final upFromCards = seasonsNode ?? widget.initialFocusNode;
 
         // Isolate hero art and backdrop into their own layers so scrolling
         // content doesn't re-rasterize them. The backdrop repaints only when
         // its URL swaps.
         final hero = RepaintBoundary(
-          child: _buildHero(context, currentItem, cardSpecs),
+          child: _buildHero(
+            context,
+            currentItem,
+            cardSpecs,
+            seasonsNode: seasonsNode,
+            overflowSections: [if (overflowSection != null) overflowSection],
+          ),
         );
-        final cards = _buildCards(context, cardSpecs);
+        final cards = _buildCards(context, cardSpecs, upTarget: upFromCards);
         final backdrop = RepaintBoundary(
           child: ValueListenableBuilder<String?>(
             valueListenable: widget.backdropUrl,

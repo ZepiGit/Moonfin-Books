@@ -372,8 +372,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen>
     _lastFocusedBackdropItemId = null;
 
     final nouveauState = _nouveauContentKey.currentState;
-    final nouveauHandled =
-        nouveauState?.restoreBackdropAfterResume() ?? false;
+    final nouveauHandled = nouveauState?.restoreBackdropAfterResume() ?? false;
 
     if (!nouveauHandled) {
       final item = _viewModel.item;
@@ -540,7 +539,10 @@ class _ItemDetailScreenState extends State<ItemDetailScreen>
         }
       }
 
-      _backgroundService.setBackground(focusedItem, context: BlurContext.details);
+      _backgroundService.setBackground(
+        focusedItem,
+        context: BlurContext.details,
+      );
       final nextUrl = _backgroundService.currentUrl;
       if (nextUrl != _backdropUrl.value) {
         _backdropUrl.value = nextUrl;
@@ -694,8 +696,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen>
       ),
       onToggleNavbar: (show) => setState(() => _showNavbar = show),
       actionsExpanded: _actionsExpanded,
-      onActionsExpandedChanged: (val) =>
-          setState(() => _actionsExpanded = val),
+      onActionsExpandedChanged: (val) => setState(() => _actionsExpanded = val),
       onCollapseBiography: () => setState(() {}),
     );
   }
@@ -723,8 +724,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen>
       ),
       onToggleNavbar: (show) => setState(() => _showNavbar = show),
       actionsExpanded: _actionsExpanded,
-      onActionsExpandedChanged: (val) =>
-          setState(() => _actionsExpanded = val),
+      onActionsExpandedChanged: (val) => setState(() => _actionsExpanded = val),
       onCollapseBiography: () => setState(() {}),
     );
   }
@@ -795,8 +795,8 @@ class _ItemDetailScreenState extends State<ItemDetailScreen>
 
         DetailScreenStyle.spotlight =>
           detailFallsBackToModern(_viewModel.item?.type)
-            ? _buildModernContent()
-            : _buildSpotlightContent(),
+              ? _buildModernContent()
+              : _buildSpotlightContent(),
 
         DetailScreenStyle.nouveau => NouveauDetailContent(
           key: _nouveauContentKey,
@@ -3663,9 +3663,8 @@ class _DetailContentState extends State<_DetailContent> {
   }) {
     final l10n = AppLocalizations.of(context);
     if (tracks.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.noItemsLoaded(itemLabel))));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(l10n.noItemsLoaded(itemLabel))));
       return;
     }
 
@@ -3685,9 +3684,8 @@ class _DetailContentState extends State<_DetailContent> {
     final l10n = AppLocalizations.of(context);
     final tracks = viewModel.tracks.where(_isAudioItem).toList(growable: false);
     if (tracks.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.noTracksLoaded)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(l10n.noTracksLoaded)));
       return;
     }
 
@@ -4506,17 +4504,9 @@ class DetailPosterImage extends StatelessWidget {
             ),
           ),
           if (item.isFavorite)
-            Positioned(
-              top: 6,
-              left: 6,
-              child: MediaFavoriteBadge(size: 26),
-            ),
+            Positioned(top: 6, left: 6, child: MediaFavoriteBadge(size: 26)),
           if (item.isPlayed)
-            Positioned(
-              top: 6,
-              right: 6,
-              child: MediaWatchedBadge(size: 26),
-            ),
+            Positioned(top: 6, right: 6, child: MediaWatchedBadge(size: 26)),
           if ((item.playedPercentage ?? 0) > 0)
             Positioned(
               left: 6,
@@ -4592,17 +4582,9 @@ class _EpisodeThumbnail extends StatelessWidget {
             ),
           ),
           if (item.isFavorite)
-            Positioned(
-              top: 6,
-              left: 6,
-              child: MediaFavoriteBadge(size: 24),
-            ),
+            Positioned(top: 6, left: 6, child: MediaFavoriteBadge(size: 24)),
           if (item.isPlayed)
-            Positioned(
-              top: 6,
-              right: 6,
-              child: MediaWatchedBadge(size: 24),
-            ),
+            Positioned(top: 6, right: 6, child: MediaWatchedBadge(size: 24)),
           if ((item.playedPercentage ?? 0) > 0)
             Positioned(
               left: 6,
@@ -4862,6 +4844,52 @@ class DetailMetadataRow extends StatelessWidget {
   }
 }
 
+/// One nested row in the Spotlight "More Actions" menu. Instead of running an
+/// action on the item it opens a screen of whole sections, so a layout can
+/// park content there (a series' cast, crew, studios and recommendations)
+/// without each of those sections costing a summary card of its own.
+class DetailOverflowSection {
+  final String label;
+  final IconData icon;
+
+  /// Opens the nested screen once the menu has closed. [returnFocus] is the
+  /// node that held focus when the menu was opened, so a host that shows a
+  /// screen of its own can hand focus back to the More button when that
+  /// screen closes.
+  final Future<void> Function(BuildContext context, FocusNode? returnFocus)
+  onOpen;
+
+  const DetailOverflowSection({
+    required this.label,
+    required this.icon,
+    required this.onOpen,
+  });
+}
+
+/// What a row in the "More Actions" menu points at.
+enum DetailOverflowRowKind { section, action }
+
+/// A single row of the menu, as the position of the thing it points at. Kept
+/// separate from the widgets so the menu's order can be pinned without a pump,
+/// and so a host that adds or drops a section never renumbers its actions.
+class DetailOverflowMenuRow {
+  final DetailOverflowRowKind kind;
+  final int index;
+
+  const DetailOverflowMenuRow.section(this.index)
+    : kind = DetailOverflowRowKind.section;
+
+  const DetailOverflowMenuRow.action(this.index)
+    : kind = DetailOverflowRowKind.action;
+
+  @override
+  bool operator ==(Object other) => other is DetailOverflowMenuRow &&
+      other.kind == kind && other.index == index;
+
+  @override
+  int get hashCode => Object.hash(kind, index);
+}
+
 class DetailActionButtons extends StatefulWidget {
   final ItemDetailViewModel viewModel;
   final String? itemId;
@@ -4905,6 +4933,14 @@ class DetailActionButtons extends StatefulWidget {
   /// even when the menu would hold a single action.
   final bool overflowAsMenu;
 
+  /// Nested content sections to offer above the item's own actions when the
+  /// row overflows into the "More Actions" menu. Each one opens a screen
+  /// instead of running an action, so the content behind it stays reachable
+  /// without holding a slot on the detail page. Ignored unless
+  /// [overflowAsMenu] is set, because the expanding inline overflow has no
+  /// menu to nest in.
+  final List<DetailOverflowSection> overflowSections;
+
   /// How wide the column hosting the row is. The two column layout measures
   /// its buttons against this to decide when they stop fitting on one line,
   /// which the per device count gets wrong in a column this narrow.
@@ -4932,6 +4968,7 @@ class DetailActionButtons extends StatefulWidget {
     this.nouveauStyle = false,
     this.fullWidthPrimary = false,
     this.overflowAsMenu = false,
+    this.overflowSections = const [],
     this.rowMaxWidth,
     this.actionRowRightFocusNode,
     this.extraFirstFocusNode,
@@ -5900,7 +5937,9 @@ class _HorizontalActionRowState extends State<_HorizontalActionRow> {
   @override
   Widget build(BuildContext context) {
     final showDesktopChevrons =
-        _hasOverflow && PlatformDetection.useDesktopUi && !PlatformDetection.isTV;
+        _hasOverflow &&
+        PlatformDetection.useDesktopUi &&
+        !PlatformDetection.isTV;
 
     final scrollRow = NotificationListener<ScrollNotification>(
       onNotification: (notification) {
@@ -5941,12 +5980,14 @@ class _HorizontalActionRowState extends State<_HorizontalActionRow> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        WidgetsBinding.instance.addPostFrameCallback((_) => _updateScrollMetrics());
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _updateScrollMetrics(),
+        );
 
         final isMobile = _isCompact(context);
         final desktopScale = _desktopUiScale();
-        final double bWidth = widget.buttonWidth ??
-            (isMobile ? 80.0 : 108.0 * desktopScale);
+        final double bWidth =
+            widget.buttonWidth ?? (isMobile ? 80.0 : 108.0 * desktopScale);
         final double spacing = widget.spacing;
         _effectiveButtonWidth = bWidth;
 
@@ -5968,7 +6009,10 @@ class _HorizontalActionRowState extends State<_HorizontalActionRow> {
           pillRow = Container(
             width: pillWidth,
             clipBehavior: Clip.antiAlias,
-            padding: const EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 4),
+            padding: const EdgeInsets.symmetric(
+              horizontal: horizontalPadding,
+              vertical: 4,
+            ),
             decoration: BoxDecoration(
               color: Colors.black.withValues(alpha: 0.32),
               borderRadius: BorderRadius.circular(999),
@@ -5989,10 +6033,7 @@ class _HorizontalActionRowState extends State<_HorizontalActionRow> {
         }
 
         if (!showDesktopChevrons) {
-          return Align(
-            alignment: widget.alignment,
-            child: pillRow,
-          );
+          return Align(alignment: widget.alignment, child: pillRow);
         }
 
         final int chevronStep = fitCount >= 5 ? 3 : (fitCount >= 3 ? 2 : 1);
@@ -6044,6 +6085,36 @@ class _HorizontalActionRowState extends State<_HorizontalActionRow> {
       },
     );
   }
+}
+
+/// Which row of the "More Actions" menu was chosen, and how: an action has a
+/// press and a long press, a nested section only a press.
+enum _OverflowPress { select, longPress }
+
+class _OverflowSelection {
+  final DetailOverflowRowKind kind;
+  final _OverflowPress press;
+  final int index;
+
+  const _OverflowSelection._(this.kind, this.press, this.index);
+
+  factory _OverflowSelection.section(int index) => _OverflowSelection._(
+    DetailOverflowRowKind.section,
+    _OverflowPress.select,
+    index,
+  );
+
+  factory _OverflowSelection.action(int index) => _OverflowSelection._(
+    DetailOverflowRowKind.action,
+    _OverflowPress.select,
+    index,
+  );
+
+  factory _OverflowSelection.actionLongPress(int index) => _OverflowSelection._(
+    DetailOverflowRowKind.action,
+    _OverflowPress.longPress,
+    index,
+  );
 }
 
 class DetailActionButtonsState extends State<DetailActionButtons> {
@@ -6408,11 +6479,8 @@ class DetailActionButtonsState extends State<DetailActionButtons> {
     final painter = TextPainter(
       text: TextSpan(
         text: label,
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-          fontWeight: FontWeight.bold,
-          fontSize: 13,
-          height: 1.1,
-        ),
+        style: Theme.of(context).textTheme.bodyMedium
+            ?.copyWith(fontWeight: FontWeight.bold, fontSize: 13, height: 1.1),
       ),
       textDirection: Directionality.of(context),
       textScaler: MediaQuery.textScalerOf(context),
@@ -6541,50 +6609,87 @@ class DetailActionButtonsState extends State<DetailActionButtons> {
     }
   }
 
-  /// Spotlight overflow: opens the remaining actions as a popup menu. Each
-  /// row invokes the original button's handler after the menu closes, so no
+  /// Spotlight overflow: opens the remaining actions as a popup menu, with any
+  /// [DetailActionButtons.overflowSections] nested above them. Each row
+  /// invokes the original button's handler after the menu closes, so no
   /// action logic is duplicated. Focus returns to the ellipsis through the
   /// dialog's focus-restore wrapper.
   Future<void> _showOverflowMenu(
     BuildContext context,
-    List<Widget> extraButtons,
-  ) async {
+    List<Widget> extraButtons, {
+    FocusNode? returnFocus,
+  }) async {
     final l10n = AppLocalizations.of(context);
+    final sections = widget.overflowAsMenu
+        ? widget.overflowSections
+        : const <DetailOverflowSection>[];
     final actions = <_DetailActionButton>[
-      for (final btn in extraButtons)
-        ?_actionForOverflow(context, btn),
+      for (final btn in extraButtons) ?_actionForOverflow(context, btn),
     ];
-    if (actions.isEmpty) return;
-    final selected = await showStyledPlayerDialog<VoidCallback>(
+    if (actions.isEmpty && sections.isEmpty) return;
+    final rows = overflowMenuRows(
+      sectionCount: sections.length,
+      actionCount: actions.length,
+    );
+    final selected = await showStyledPlayerDialog<_OverflowSelection>(
       context,
       title: l10n.spotlightMoreActions,
       builder: (dialogContext) => ListView.builder(
         shrinkWrap: true,
-        itemCount: actions.length,
+        itemCount: rows.length,
         itemBuilder: (rowContext, index) {
-          final action = actions[index];
+          final row = rows[index];
+          if (row.kind == DetailOverflowRowKind.section) {
+            final section = sections[row.index];
+            return _SpotlightOverflowTile(
+              label: section.label,
+              icon: section.icon,
+              autofocus: index == 0,
+              opensNestedScreen: true,
+              onTap: () => Navigator.pop(
+                rowContext,
+                _OverflowSelection.section(row.index),
+              ),
+            );
+          }
+          final action = actions[row.index];
           return _SpotlightOverflowTile(
-            action: action,
+            label: action.label,
+            icon: action.icon,
+            iconBuilder: action.iconBuilder,
+            isActive: action.isActive,
+            activeColor: action.activeColor,
             autofocus: index == 0,
-            onTap: () => Navigator.pop(rowContext, action.onPressed),
+            onTap: () =>
+                Navigator.pop(rowContext, _OverflowSelection.action(row.index)),
             onLongPress: action.onLongPress == null
                 ? null
-                : () => Navigator.pop(rowContext, action.onLongPress),
+                : () => Navigator.pop(
+                    rowContext,
+                    _OverflowSelection.actionLongPress(row.index),
+                  ),
           );
         },
       ),
     );
-    if (selected != null) {
-      // Let the pop and focus restore settle first, since several actions
-      // immediately open a dialog of their own.
-      WidgetsBinding.instance.addPostFrameCallback((_) => selected());
-    }
+    if (selected == null) return;
+    // Let the pop and focus restore settle first, since several actions
+    // immediately open a dialog of their own.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (selected.kind == DetailOverflowRowKind.section) {
+        unawaited(sections[selected.index].onOpen(context, returnFocus));
+        return;
+      }
+      final action = actions[selected.index];
+      if (selected.press == _OverflowPress.longPress) {
+        action.onLongPress!();
+      } else {
+        action.onPressed();
+      }
+    });
   }
 
-  _DetailActionButton? _actionForOverflow(
-    BuildContext context,
-    Widget button,
-  ) {
+  _DetailActionButton? _actionForOverflow(BuildContext context, Widget button) {
     if (button is _DetailActionButton) {
       return button;
     }
@@ -6712,6 +6817,19 @@ class DetailActionButtonsState extends State<DetailActionButtons> {
       needsOverflow: countCapped && secondaryCount > overflowThreshold,
     );
   }
+
+  /// The rows a "More Actions" menu shows, in order: the host's nested
+  /// content sections first, so the sections behind the menu are one obvious
+  /// stop rather than something to hunt for, then the item's own actions.
+  /// Sections with nothing in them are the host's business to leave out.
+  @visibleForTesting
+  static List<DetailOverflowMenuRow> overflowMenuRows({
+    required int sectionCount,
+    required int actionCount,
+  }) => [
+    for (var i = 0; i < sectionCount; i++) DetailOverflowMenuRow.section(i),
+    for (var i = 0; i < actionCount; i++) DetailOverflowMenuRow.action(i),
+  ];
 
   int _calculateMaxVisibleButtons(BuildContext context) {
     final override = widget.maxVisibleButtonsOverride;
@@ -7515,12 +7633,10 @@ class DetailActionButtonsState extends State<DetailActionButtons> {
           ? primaryAction
           : null;
 
-      final primaryFocusNode =
-          widget.tvPlayFocusNode ?? _primaryFocusNode(0);
+      final primaryFocusNode = widget.tvPlayFocusNode ?? _primaryFocusNode(0);
 
       final runtime = item.runtime;
-      final playbackPosition =
-          item.playbackPosition ?? Duration.zero;
+      final playbackPosition = item.playbackPosition ?? Duration.zero;
 
       double? playbackProgress;
       String? remainingLabel;
@@ -7530,27 +7646,24 @@ class DetailActionButtonsState extends State<DetailActionButtons> {
           playbackPosition.inMilliseconds > 0 &&
           playbackPosition < runtime) {
         playbackProgress =
-            (playbackPosition.inMilliseconds /
-                runtime.inMilliseconds)
-                .clamp(0.0, 1.0);
+            (playbackPosition.inMilliseconds / runtime.inMilliseconds).clamp(
+              0.0,
+              1.0,
+            );
 
         final remaining = runtime - playbackPosition;
 
-        final remainingMinutes =
-        (remaining.inSeconds / 60).ceil();
+        final remainingMinutes = (remaining.inSeconds / 60).ceil();
 
         if (remainingMinutes >= 60) {
           final hours = remainingMinutes ~/ 60;
           final minutes = remainingMinutes % 60;
 
-          final formatted = minutes > 0
-              ? '${hours}h ${minutes}m'
-              : '${hours}h';
+          final formatted = minutes > 0 ? '${hours}h ${minutes}m' : '${hours}h';
 
           remainingLabel = l10n.timeRemaining(formatted);
         } else if (remainingMinutes > 0) {
-          remainingLabel =
-              l10n.timeRemaining('${remainingMinutes}m');
+          remainingLabel = l10n.timeRemaining('${remainingMinutes}m');
         }
       }
 
@@ -7566,9 +7679,7 @@ class DetailActionButtonsState extends State<DetailActionButtons> {
                       widget.upTarget != null
                   ? _focusUpTarget
                   : null,
-              onArrowDown: widget.downTarget != null
-                  ? _focusDownTarget
-                  : null,
+              onArrowDown: widget.downTarget != null ? _focusDownTarget : null,
               onArrowLeft: _focusSidebar,
               onArrowRight: orderedSecondaryButtons.isNotEmpty
                   ? () => _primaryFocusNode(1).requestFocus()
@@ -7590,9 +7701,7 @@ class DetailActionButtonsState extends State<DetailActionButtons> {
                   widget.upTarget != null
               ? _focusUpTarget
               : null,
-          onArrowDown: widget.downTarget != null
-              ? _focusDownTarget
-              : null,
+          onArrowDown: widget.downTarget != null ? _focusDownTarget : null,
           // With no primary button there is nothing to the left of the first
           // secondary, so fall back to the sidebar the primary would have used.
           onArrowLeft: index == 0
@@ -7617,15 +7726,13 @@ class DetailActionButtonsState extends State<DetailActionButtons> {
       final withDownloads = downloads == null
           ? rowContent
           : Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          rowContent,
-          SeerrItemDownloadBars(
-            state: downloads,
-          ),
-        ],
-      );
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                rowContent,
+                SeerrItemDownloadBars(state: downloads),
+              ],
+            );
 
       return Focus(
         canRequestFocus: false,
@@ -7673,15 +7780,15 @@ class DetailActionButtonsState extends State<DetailActionButtons> {
     final fitsOneLine = prefLimit == -1
         ? true
         : (widget.modernStyle && rowBudget != null
-            ? modernRowWorstWidth(
-                    allButtons.length,
-                    buttonSpacing,
-                    _modernPlayFocusedWidth(playLabel),
-                    scale: _modernButtonScale(context),
-                    expands: prefs.get(UserPreferences.cardFocusExpansion),
-                  ) <=
-                  rowBudget
-            : allButtons.length <= maxVisible);
+              ? modernRowWorstWidth(
+                      allButtons.length,
+                      buttonSpacing,
+                      _modernPlayFocusedWidth(playLabel),
+                      scale: _modernButtonScale(context),
+                      expands: prefs.get(UserPreferences.cardFocusExpansion),
+                    ) <=
+                    rowBudget
+              : allButtons.length <= maxVisible);
 
     if (isTwoColumnLayout && fitsOneLine) {
       primaryButtons = allButtons;
@@ -7720,10 +7827,10 @@ class DetailActionButtonsState extends State<DetailActionButtons> {
         countCapped: prefLimit == -1
             ? false
             : (prefLimit > 0
-                ? true
-                : (compact ||
-                    PlatformDetection.isTV ||
-                    widget.maxVisibleButtonsOverride != null)),
+                  ? true
+                  : (compact ||
+                        PlatformDetection.isTV ||
+                        widget.maxVisibleButtonsOverride != null)),
       );
       final int visibleCount = split.visibleCount;
       needsOverflow = split.needsOverflow;
@@ -7945,7 +8052,14 @@ class DetailActionButtonsState extends State<DetailActionButtons> {
         },
         onArrowRight: widget.onArrowRightAtEnd ?? () {},
         onPressed: widget.overflowAsMenu
-            ? () => unawaited(_showOverflowMenu(context, extraButtons))
+            ? () => unawaited(
+                _showOverflowMenu(
+                  context,
+                  extraButtons,
+                  returnFocus:
+                      widget.actionRowRightFocusNode ?? _overflowMoreFocusNode,
+                ),
+              )
             : () => setState(() => _expanded = !_expanded),
       );
 
@@ -8305,7 +8419,9 @@ class DetailActionButtonsState extends State<DetailActionButtons> {
                             horizontal: 16,
                           ),
                           decoration: BoxDecoration(
-                            color: hasFocus ? Colors.white12 : Colors.transparent,
+                            color: hasFocus
+                                ? Colors.white12
+                                : Colors.transparent,
                             borderRadius: AppRadius.circular(8),
                           ),
                           child: Row(
@@ -8688,15 +8804,11 @@ class DetailActionButtonsState extends State<DetailActionButtons> {
   }
 
   Future<void> playItem(
-      BuildContext context,
-      AggregatedItem item, {
-        bool resume = false,
-      }) {
-    return _play(
-      context,
-      item,
-      resume: resume,
-    );
+    BuildContext context,
+    AggregatedItem item, {
+    bool resume = false,
+  }) {
+    return _play(context, item, resume: resume);
   }
 
   void _shuffle(BuildContext context, AggregatedItem item) async {
@@ -9284,602 +9396,580 @@ class DetailActionButtonsState extends State<DetailActionButtons> {
         mediaType == 'Audio';
 
     PlaybackLaunchSession? launchSession;
-    Future<bool> preparePlayback() => _runWithDolbyVisionStartupFallbackPrompt(
-      context,
-      manager,
-      () async {
-        switch (item.type) {
-          case 'Series':
-            const episodeQueueFields = 'Overview,RunTimeTicks,UserData';
+    Future<bool>
+    preparePlayback() => _runWithDolbyVisionStartupFallbackPrompt(context, manager, () async {
+      switch (item.type) {
+        case 'Series':
+          const episodeQueueFields = 'Overview,RunTimeTicks,UserData';
 
-            final client = _clientForItem(item);
-            final data = await client.itemsApi.getEpisodes(
-              item.id,
-              fields: episodeQueueFields,
+          final client = _clientForItem(item);
+          final data = await client.itemsApi.getEpisodes(
+            item.id,
+            fields: episodeQueueFields,
+          );
+          final allEpisodes = _mapRawItemsForServer(
+            data['Items'],
+            item.serverId,
+          ).where(isEligibleNextEpisodeCandidate).toList();
+
+          if (allEpisodes.isEmpty) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(AppLocalizations.of(context).noEpisodesLoaded),
+                ),
+              );
+            }
+            throw PlaybackStartupRecoveryAbortedException();
+          }
+
+          final ws = watchStateOf(item);
+          final isFullyWatched = ws.isFullyWatched;
+          final isFullyUnwatched = ws.isFullyUnwatched;
+
+          AggregatedItem targetEpisode;
+          if (isFullyWatched || isFullyUnwatched) {
+            targetEpisode = allEpisodes.firstWhere(
+              (e) => e.parentIndexNumber == 1 && e.indexNumber == 1,
+              orElse: () => allEpisodes.first,
             );
-            final allEpisodes = _mapRawItemsForServer(
-              data['Items'],
-              item.serverId,
-            ).where(isEligibleNextEpisodeCandidate).toList();
-
-            if (allEpisodes.isEmpty) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      AppLocalizations.of(context).noEpisodesLoaded,
-                    ),
+          } else {
+            // Next Up arrives on its own future, so fall back to whatever is part
+            // way through. First unwatched can sit behind the user, since a
+            // skipped episode or a special counts as unwatched.
+            targetEpisode =
+                viewModel.nextUp ??
+                allEpisodes.firstWhere(
+                  (e) => !e.isPlayed && (e.playedPercentage ?? 0) > 0,
+                  orElse: () => allEpisodes.firstWhere(
+                    (e) => !e.isPlayed,
+                    orElse: () => allEpisodes.first,
                   ),
                 );
-              }
-              throw PlaybackStartupRecoveryAbortedException();
-            }
+          }
 
-            final ws = watchStateOf(item);
-            final isFullyWatched = ws.isFullyWatched;
-            final isFullyUnwatched = ws.isFullyUnwatched;
+          final playableSeasonEpisodes = await _seasonQueueContaining(
+            client,
+            seriesId: item.id,
+            serverId: item.serverId,
+            target: targetEpisode,
+            airedEpisodes: allEpisodes,
+            fields: episodeQueueFields,
+          );
+          final queueEpisodes = playableSeasonEpisodes.isNotEmpty
+              ? playableSeasonEpisodes
+              : <AggregatedItem>[targetEpisode];
 
-            AggregatedItem targetEpisode;
-            if (isFullyWatched || isFullyUnwatched) {
-              targetEpisode = allEpisodes.firstWhere(
-                (e) => e.parentIndexNumber == 1 && e.indexNumber == 1,
-                orElse: () => allEpisodes.first,
-              );
-            } else {
-              // Next Up arrives on its own future, so fall back to whatever is part
-              // way through. First unwatched can sit behind the user, since a
-              // skipped episode or a special counts as unwatched.
-              targetEpisode =
-                  viewModel.nextUp ??
-                  allEpisodes.firstWhere(
-                    (e) => !e.isPlayed && (e.playedPercentage ?? 0) > 0,
-                    orElse: () => allEpisodes.firstWhere(
-                      (e) => !e.isPlayed,
-                      orElse: () => allEpisodes.first,
-                    ),
-                  );
-            }
+          final startIndex = queueEpisodes.indexWhere(
+            (e) => e.id == targetEpisode.id,
+          );
+          final idx = startIndex >= 0 ? startIndex : 0;
+          var selectedEpisode = queueEpisodes[idx];
+          selectedEpisode = await _ensureHydrated(selectedEpisode);
+          queueEpisodes[idx] = selectedEpisode;
 
-            final playableSeasonEpisodes = await _seasonQueueContaining(
-              client,
-              seriesId: item.id,
-              serverId: item.serverId,
-              target: targetEpisode,
-              airedEpisodes: allEpisodes,
-              fields: episodeQueueFields,
-            );
-            final queueEpisodes = playableSeasonEpisodes.isNotEmpty
-                ? playableSeasonEpisodes
-                : <AggregatedItem>[targetEpisode];
+          final seriesQueue = await _truncateQueueIfImmediateNextUnplayable(
+            queueEpisodes,
+            startIndex: idx,
+          );
+          final startPosition = resume
+              ? (selectedEpisode.playbackPosition ?? Duration.zero)
+              : Duration.zero;
 
-            final startIndex = queueEpisodes.indexWhere(
-              (e) => e.id == targetEpisode.id,
-            );
-            final idx = startIndex >= 0 ? startIndex : 0;
-            var selectedEpisode = queueEpisodes[idx];
-            selectedEpisode = await _ensureHydrated(selectedEpisode);
-            queueEpisodes[idx] = selectedEpisode;
-
-            final seriesQueue = await _truncateQueueIfImmediateNextUnplayable(
-              queueEpisodes,
-              startIndex: idx,
-            );
-            final startPosition = resume
-                ? (selectedEpisode.playbackPosition ?? Duration.zero)
-                : Duration.zero;
-
-            ensureLaunchStillWanted(launchSession);
-            final prerolls = await _prerollsForStart(
-              selectedEpisode,
-              startPosition,
-              useExternalPlayer: useExternalPlayer,
-            );
-            ensureLaunchStillWanted(launchSession);
-            final dvForceTranscode =
-                context.mounted &&
-                await _shouldForceTranscodeForDolbyVision(context, [
-                  selectedEpisode,
-                ]);
-            final directAllowed = !dvForceTranscode && !forceTranscode;
-
-            final epMediaStreams = _mediaStreamsForCurrentSelection(
-              selectedEpisode,
-            );
-            final epAudioStreams = epMediaStreams
-                .where((s) => s['Type'] == 'Audio')
-                .toList();
-            final epSubtitleStreams = epMediaStreams
-                .where((s) => s['Type'] == 'Subtitle')
-                .toList();
-            final epAudioStreamIndex = _effectiveAudioStreamIndex(
-              epAudioStreams,
-            );
-            final epSubtitleStreamIndex = _effectiveSubtitleStreamIndex(
-              epSubtitleStreams,
-              epAudioStreams,
-              item: selectedEpisode,
-            );
-
-            await _playQueueWithPrerolls(
-              manager,
-              launchSession: launchSession,
-              queue: seriesQueue,
-              prerolls: prerolls,
-              target: selectedEpisode,
-              startIndex: idx,
-              startPosition: startPosition,
-              audioStreamIndex: epAudioStreamIndex,
-              subtitleStreamIndex: epSubtitleStreamIndex,
-              directAllowed: directAllowed,
-            );
-
-          case 'Season':
-            final episodes = viewModel.episodes
-                .where(isEligibleNextEpisodeCandidate)
-                .toList();
-            if (episodes.isEmpty) {
-              throw PlaybackStartupRecoveryAbortedException();
-            }
-            final startIndex = resume
-                ? episodes.indexWhere(
-                    (e) => (e.playedPercentage ?? 0) > 0 && !e.isPlayed,
-                  )
-                : episodes.indexWhere((e) => !e.isPlayed);
-            final idx = startIndex >= 0 ? startIndex : 0;
-            var selectedEpisode = episodes[idx];
-            selectedEpisode = await _ensureHydrated(selectedEpisode);
-            episodes[idx] = selectedEpisode;
-            ensureLaunchStillWanted(launchSession);
-
-            final seasonQueue = await _truncateQueueIfImmediateNextUnplayable(
-              episodes,
-              startIndex: idx,
-            );
-            final startPosition = resume
-                ? (selectedEpisode.playbackPosition ?? Duration.zero)
-                : Duration.zero;
-            ensureLaunchStillWanted(launchSession);
-            final prerolls = await _prerollsForStart(
-              selectedEpisode,
-              startPosition,
-              useExternalPlayer: useExternalPlayer,
-            );
-            ensureLaunchStillWanted(launchSession);
-            final dvForceTranscode =
-                context.mounted &&
-                await _shouldForceTranscodeForDolbyVision(context, [
-                  selectedEpisode,
-                ]);
-            final directAllowed = !dvForceTranscode && !forceTranscode;
-
-            final epMediaStreams = _mediaStreamsForCurrentSelection(
-              selectedEpisode,
-            );
-            final epAudioStreams = epMediaStreams
-                .where((s) => s['Type'] == 'Audio')
-                .toList();
-            final epSubtitleStreams = epMediaStreams
-                .where((s) => s['Type'] == 'Subtitle')
-                .toList();
-            final epAudioStreamIndex = _effectiveAudioStreamIndex(
-              epAudioStreams,
-            );
-            final epSubtitleStreamIndex = _effectiveSubtitleStreamIndex(
-              epSubtitleStreams,
-              epAudioStreams,
-              item: selectedEpisode,
-            );
-
-            await _playQueueWithPrerolls(
-              manager,
-              launchSession: launchSession,
-              queue: seasonQueue,
-              prerolls: prerolls,
-              target: selectedEpisode,
-              startIndex: idx,
-              startPosition: startPosition,
-              audioStreamIndex: epAudioStreamIndex,
-              subtitleStreamIndex: epSubtitleStreamIndex,
-              directAllowed: directAllowed,
-            );
-
-          case 'Episode':
-            var episodes = viewModel.episodes;
-            if (episodes.isEmpty || !episodes.any((e) => e.id == item.id)) {
-              final seriesId = item.seriesId;
-              // Matches the list on screen, which for an inlined special is the
-              // season being browsed rather than Specials.
-              final seasonId = viewModel.effectiveSeasonId ?? item.seasonId;
-              if (seriesId != null && seriesId.isNotEmpty) {
-                try {
-                  const episodeQueueFields = 'Overview,RunTimeTicks,UserData';
-                  final client = _clientForItem(item);
-                  final data = await client.itemsApi.getEpisodes(
-                    seriesId,
-                    seasonId: seasonId,
-                    fields: episodeQueueFields,
-                  );
-                  episodes = _mapRawItemsForServer(
-                    data['Items'],
-                    item.serverId,
-                  );
-                } catch (_) {}
-              }
-            }
-            ensureLaunchStillWanted(launchSession);
-
-            if (episodes.length > 1) {
-              final playableEpisodes = episodes
-                  .where(
-                    (e) => e.id == item.id || isEligibleNextEpisodeCandidate(e),
-                  )
-                  .toList();
-              final startIndex = playableEpisodes.indexWhere(
-                (e) => e.id == item.id,
-              );
-              final idx = startIndex >= 0 ? startIndex : 0;
-              var selectedEpisode = playableEpisodes[idx];
-              selectedEpisode = await _ensureHydrated(selectedEpisode);
-              playableEpisodes[idx] = selectedEpisode;
-              ensureLaunchStillWanted(launchSession);
-
-              final episodeQueue =
-                  await _truncateQueueIfImmediateNextUnplayable(
-                    playableEpisodes,
-                    startIndex: idx,
-                  );
-              ensureLaunchStillWanted(launchSession);
-
-              // Fallback to the master item's position context if it's the target episode
-              final startPosition = resume
-                  ? ((selectedEpisode.id == item.id
-                            ? item.playbackPosition
-                            : selectedEpisode.playbackPosition) ??
-                        Duration.zero)
-                  : Duration.zero;
-
-              final prerolls = await _prerollsForStart(
+          ensureLaunchStillWanted(launchSession);
+          final prerolls = await _prerollsForStart(
+            selectedEpisode,
+            startPosition,
+            useExternalPlayer: useExternalPlayer,
+          );
+          ensureLaunchStillWanted(launchSession);
+          final dvForceTranscode =
+              context.mounted &&
+              await _shouldForceTranscodeForDolbyVision(context, [
                 selectedEpisode,
-                startPosition,
-                useExternalPlayer: useExternalPlayer,
-              );
-              ensureLaunchStillWanted(launchSession);
+              ]);
+          final directAllowed = !dvForceTranscode && !forceTranscode;
 
-              final dvForceTranscode =
-                  context.mounted &&
-                  await _shouldForceTranscodeForDolbyVision(context, [
-                    selectedEpisode,
-                  ], mediaSourceId: widget.selectedMediaSourceId);
-              final directAllowed = !dvForceTranscode && !forceTranscode;
-              await _playQueueWithPrerolls(
-                manager,
-                launchSession: launchSession,
-                queue: episodeQueue,
-                prerolls: prerolls,
-                target: selectedEpisode,
-                startIndex: idx,
-                startPosition: startPosition,
-                audioStreamIndex: audioStreamIndex,
-                subtitleStreamIndex: subtitleStreamIndex,
-                mediaSourceId: widget.selectedMediaSourceId,
-                audioSelectionExplicit: viewModel.selectedAudioIndex != null,
-                subtitleSelectionExplicit:
-                    viewModel.selectedSubtitleIndex != null,
-                directAllowed: directAllowed,
-              );
-              break;
-            }
-            continue defaultCase;
+          final epMediaStreams = _mediaStreamsForCurrentSelection(
+            selectedEpisode,
+          );
+          final epAudioStreams = epMediaStreams
+              .where((s) => s['Type'] == 'Audio')
+              .toList();
+          final epSubtitleStreams = epMediaStreams
+              .where((s) => s['Type'] == 'Subtitle')
+              .toList();
+          final epAudioStreamIndex = _effectiveAudioStreamIndex(epAudioStreams);
+          final epSubtitleStreamIndex = _effectiveSubtitleStreamIndex(
+            epSubtitleStreams,
+            epAudioStreams,
+            item: selectedEpisode,
+          );
 
-          case 'BoxSet':
-            final playableQueue = await _loadFolderPlayableItemsForShuffle(
-              item,
-              fields: 'Overview,RunTimeTicks,UserData',
-            );
-            if (playableQueue.isEmpty) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      AppLocalizations.of(context).noEpisodesLoaded,
-                    ),
-                  ),
+          await _playQueueWithPrerolls(
+            manager,
+            launchSession: launchSession,
+            queue: seriesQueue,
+            prerolls: prerolls,
+            target: selectedEpisode,
+            startIndex: idx,
+            startPosition: startPosition,
+            audioStreamIndex: epAudioStreamIndex,
+            subtitleStreamIndex: epSubtitleStreamIndex,
+            directAllowed: directAllowed,
+          );
+
+        case 'Season':
+          final episodes = viewModel.episodes
+              .where(isEligibleNextEpisodeCandidate)
+              .toList();
+          if (episodes.isEmpty) {
+            throw PlaybackStartupRecoveryAbortedException();
+          }
+          final startIndex = resume
+              ? episodes.indexWhere(
+                  (e) => (e.playedPercentage ?? 0) > 0 && !e.isPlayed,
+                )
+              : episodes.indexWhere((e) => !e.isPlayed);
+          final idx = startIndex >= 0 ? startIndex : 0;
+          var selectedEpisode = episodes[idx];
+          selectedEpisode = await _ensureHydrated(selectedEpisode);
+          episodes[idx] = selectedEpisode;
+          ensureLaunchStillWanted(launchSession);
+
+          final seasonQueue = await _truncateQueueIfImmediateNextUnplayable(
+            episodes,
+            startIndex: idx,
+          );
+          final startPosition = resume
+              ? (selectedEpisode.playbackPosition ?? Duration.zero)
+              : Duration.zero;
+          ensureLaunchStillWanted(launchSession);
+          final prerolls = await _prerollsForStart(
+            selectedEpisode,
+            startPosition,
+            useExternalPlayer: useExternalPlayer,
+          );
+          ensureLaunchStillWanted(launchSession);
+          final dvForceTranscode =
+              context.mounted &&
+              await _shouldForceTranscodeForDolbyVision(context, [
+                selectedEpisode,
+              ]);
+          final directAllowed = !dvForceTranscode && !forceTranscode;
+
+          final epMediaStreams = _mediaStreamsForCurrentSelection(
+            selectedEpisode,
+          );
+          final epAudioStreams = epMediaStreams
+              .where((s) => s['Type'] == 'Audio')
+              .toList();
+          final epSubtitleStreams = epMediaStreams
+              .where((s) => s['Type'] == 'Subtitle')
+              .toList();
+          final epAudioStreamIndex = _effectiveAudioStreamIndex(epAudioStreams);
+          final epSubtitleStreamIndex = _effectiveSubtitleStreamIndex(
+            epSubtitleStreams,
+            epAudioStreams,
+            item: selectedEpisode,
+          );
+
+          await _playQueueWithPrerolls(
+            manager,
+            launchSession: launchSession,
+            queue: seasonQueue,
+            prerolls: prerolls,
+            target: selectedEpisode,
+            startIndex: idx,
+            startPosition: startPosition,
+            audioStreamIndex: epAudioStreamIndex,
+            subtitleStreamIndex: epSubtitleStreamIndex,
+            directAllowed: directAllowed,
+          );
+
+        case 'Episode':
+          var episodes = viewModel.episodes;
+          if (episodes.isEmpty || !episodes.any((e) => e.id == item.id)) {
+            final seriesId = item.seriesId;
+            // Matches the list on screen, which for an inlined special is the
+            // season being browsed rather than Specials.
+            final seasonId = viewModel.effectiveSeasonId ?? item.seasonId;
+            if (seriesId != null && seriesId.isNotEmpty) {
+              try {
+                const episodeQueueFields = 'Overview,RunTimeTicks,UserData';
+                final client = _clientForItem(item);
+                final data = await client.itemsApi.getEpisodes(
+                  seriesId,
+                  seasonId: seasonId,
+                  fields: episodeQueueFields,
                 );
-              }
-              throw PlaybackStartupRecoveryAbortedException();
+                episodes = _mapRawItemsForServer(data['Items'], item.serverId);
+              } catch (_) {}
             }
+          }
+          ensureLaunchStillWanted(launchSession);
 
-            final (startIndex, startPosition) = _resolveQueueResumeStart(
-              playableQueue,
-            );
-
-            ensureLaunchStillWanted(launchSession);
-            var targetItem = playableQueue[startIndex];
-            targetItem = await _ensureHydrated(targetItem);
-            playableQueue[startIndex] = targetItem;
-            ensureLaunchStillWanted(launchSession);
-
-            final dvForceTranscode =
-                context.mounted &&
-                await _shouldForceTranscodeForDolbyVision(context, [
-                  targetItem,
-                ]);
-            final directAllowed = !dvForceTranscode && !forceTranscode;
-
-            final epMediaStreams = _mediaStreamsForCurrentSelection(targetItem);
-            final epAudioStreams = epMediaStreams
-                .where((s) => s['Type'] == 'Audio')
+          if (episodes.length > 1) {
+            final playableEpisodes = episodes
+                .where(
+                  (e) => e.id == item.id || isEligibleNextEpisodeCandidate(e),
+                )
                 .toList();
-            final epSubtitleStreams = epMediaStreams
-                .where((s) => s['Type'] == 'Subtitle')
-                .toList();
-            final epAudioStreamIndex = _effectiveAudioStreamIndex(
-              epAudioStreams,
+            final startIndex = playableEpisodes.indexWhere(
+              (e) => e.id == item.id,
             );
-            final epSubtitleStreamIndex = _effectiveSubtitleStreamIndex(
-              epSubtitleStreams,
-              epAudioStreams,
-              item: targetItem,
-            );
-
-            await runPlaybackStart(
-              launchSession,
-              () => manager.playItems(
-                playableQueue,
-                startIndex: startIndex,
-                startPosition: startPosition,
-                audioStreamIndex: epAudioStreamIndex,
-                subtitleStreamIndex: epSubtitleStreamIndex,
-                audioSelectionExplicit: false,
-                subtitleSelectionExplicit: false,
-                enableDirectPlay: directAllowed,
-                enableDirectStream: directAllowed,
-              ),
-            );
-            break;
-
-          case 'MusicArtist':
-            final client = _clientForItem(item);
-            final data = await client.itemsApi.getItems(
-              artistIds: [item.id],
-              includeItemTypes: const ['Audio'],
-              sortBy: 'Album,ParentIndexNumber,IndexNumber,SortName',
-              recursive: true,
-              fields: 'PrimaryImageAspectRatio,BasicSyncInfo',
-            );
-            final tracks = _mapRawItemsForServer(data['Items'], item.serverId);
-            if (tracks.isEmpty) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(AppLocalizations.of(context).noItemsFound),
-                  ),
-                );
-              }
-              throw PlaybackStartupRecoveryAbortedException();
-            }
-            await runPlaybackStart(
-              launchSession,
-              () => manager.playItems(tracks),
-            );
-            break;
-
-          case 'MusicAlbum':
-            var tracks = viewModel.tracks;
-            if (tracks.isEmpty) {
-              final client = _clientForItem(item);
-              final data = await client.itemsApi.getItems(
-                parentId: item.id,
-                includeItemTypes: const ['Audio'],
-                sortBy: 'ParentIndexNumber,IndexNumber,SortName',
-                fields:
-                    'PrimaryImageAspectRatio,BasicSyncInfo,UserData,RunTimeTicks',
-              );
-              tracks = _mapRawItemsForServer(data['Items'], item.serverId);
-            }
-            if (tracks.isEmpty) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(AppLocalizations.of(context).noItemsFound),
-                  ),
-                );
-              }
-              throw PlaybackStartupRecoveryAbortedException();
-            }
-            int albumStartIndex = 0;
-            if (resume) {
-              final resumeIdx = tracks.indexWhere(
-                (e) =>
-                    !e.isPlayed &&
-                    ((e.playbackPosition?.inMilliseconds ?? 0) > 0 ||
-                        (e.playedPercentage ?? 0) > 0),
-              );
-              if (resumeIdx >= 0) {
-                albumStartIndex = resumeIdx;
-              }
-            }
-            // Music remembers which track was playing but starts it from the
-            // beginning, matching standard music player behavior.
-            await runPlaybackStart(
-              launchSession,
-              () => manager.playItems(tracks, startIndex: albumStartIndex),
-            );
-            break;
-
-          case 'Playlist':
-            var tracks = viewModel.tracks;
-            if (tracks.isEmpty) {
-              final client = _clientForItem(item);
-              final data = await client.itemsApi.getPlaylistItems(item.id);
-              tracks = _mapRawItemsForServer(data['Items'], item.serverId);
-            }
-            if (tracks.isEmpty) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(AppLocalizations.of(context).noItemsFound),
-                  ),
-                );
-              }
-              throw PlaybackStartupRecoveryAbortedException();
-            }
+            final idx = startIndex >= 0 ? startIndex : 0;
+            var selectedEpisode = playableEpisodes[idx];
+            selectedEpisode = await _ensureHydrated(selectedEpisode);
+            playableEpisodes[idx] = selectedEpisode;
             ensureLaunchStillWanted(launchSession);
 
-            // Start at the first unwatched item, or resume the one left partway
-            // through, instead of always restarting from the top.
-            final (startIndex, startPosition) = _resolveQueueResumeStart(
-              tracks,
+            final episodeQueue = await _truncateQueueIfImmediateNextUnplayable(
+              playableEpisodes,
+              startIndex: idx,
             );
+            ensureLaunchStillWanted(launchSession);
 
-            // Playlists can contain video, so honor the Dolby Vision
-            // force-transcode check before allowing direct play/stream.
-            final dvForceTranscode =
-                context.mounted &&
-                await _shouldForceTranscodeForDolbyVision(context, tracks);
-            final directAllowed = !dvForceTranscode && !forceTranscode;
-            await runPlaybackStart(
-              launchSession,
-              () => manager.playItems(
-                tracks,
-                startIndex: startIndex,
-                startPosition: startPosition,
-                enableDirectPlay: directAllowed,
-                enableDirectStream: directAllowed,
-              ),
-            );
-            break;
-
-          case 'AudioBook':
-            final client = _clientForItem(item);
-            const audioChildFields =
-                'BasicSyncInfo,PrimaryImageAspectRatio,RunTimeTicks,MediaSources,MediaSourceCount,MediaType,IndexNumber,ParentIndexNumber,Artists,AlbumArtist,Genres,Chapters,UserData';
-            bool isAudioChild(dynamic e) {
-              final childType = e is Map ? e['Type']?.toString() : null;
-              return childType == 'Audio' || childType == 'AudioBook';
-            }
-
-            // A container audiobook lists its chapters as child items, so only
-            // a folder is worth asking about. A ParentId query against a leaf
-            // times the server out, and where it answers it ignores the filter
-            // and hands back the top level libraries, which the check drops.
-            if (item.isFolder) {
-              final data = await client.itemsApi.getItems(
-                parentId: item.id,
-                includeItemTypes: const ['Audio', 'AudioBook'],
-                sortBy: 'ParentIndexNumber,IndexNumber,SortName',
-                fields: audioChildFields,
-              );
-              final rawChildren = (data['Items'] as List?) ?? const [];
-              final childItems = rawChildren.where(isAudioChild).toList();
-              if (childItems.isNotEmpty) {
-                final children = _mapRawItemsForServer(childItems, item.serverId);
-                int startIndex = 0;
-                Duration startPos = Duration.zero;
-                if (resume) {
-                  final resumeIdx = children.indexWhere(
-                    (e) =>
-                        !e.isPlayed &&
-                        ((e.playbackPosition?.inMilliseconds ?? 0) > 0 ||
-                            (e.playedPercentage ?? 0) > 0),
-                  );
-                  if (resumeIdx >= 0) {
-                    startIndex = resumeIdx;
-                    startPos =
-                        children[resumeIdx].playbackPosition ?? Duration.zero;
-                  } else {
-                    final nextUnplayed = children.indexWhere((e) => !e.isPlayed);
-                    if (nextUnplayed >= 0) {
-                      startIndex = nextUnplayed;
-                    }
-                  }
-                }
-                await runPlaybackStart(
-                  launchSession,
-                  () => manager.playItems(
-                    children,
-                    startIndex: startIndex,
-                    startPosition: startPos,
-                  ),
-                );
-                break;
-              }
-            }
-
-            // Leaf audiobook: enqueue the sibling chapters from the parent
-            // folder so the book plays through, starting at this file.
-            final parentId = item.rawData['ParentId']?.toString();
-            if (parentId != null && parentId.isNotEmpty) {
-              final siblingData = await client.itemsApi.getItems(
-                parentId: parentId,
-                includeItemTypes: const ['Audio', 'AudioBook'],
-                sortBy: 'ParentIndexNumber,IndexNumber,SortName',
-                fields: audioChildFields,
-              );
-              final siblingsRaw = (siblingData['Items'] as List?) ?? const [];
-              final siblings = _mapRawItemsForServer(
-                siblingsRaw.where(isAudioChild).toList(),
-                item.serverId,
-              );
-              final startIndex = siblings.indexWhere((t) => t.id == item.id);
-              if (siblings.isNotEmpty && startIndex >= 0) {
-                final targetSibling = siblings[startIndex];
-                final startPos = resume
-                    ? (targetSibling.playbackPosition ??
-                          item.playbackPosition ??
-                          Duration.zero)
-                    : Duration.zero;
-                await runPlaybackStart(
-                  launchSession,
-                  () => manager.playItems(
-                    siblings,
-                    startIndex: startIndex,
-                    startPosition: startPos,
-                  ),
-                );
-                break;
-              }
-            }
-
-            continue defaultCase;
-
-          defaultCase:
-          default:
+            // Fallback to the master item's position context if it's the target episode
             final startPosition = resume
-                ? (item.playbackPosition ?? Duration.zero)
+                ? ((selectedEpisode.id == item.id
+                          ? item.playbackPosition
+                          : selectedEpisode.playbackPosition) ??
+                      Duration.zero)
                 : Duration.zero;
+
             final prerolls = await _prerollsForStart(
-              item,
+              selectedEpisode,
               startPosition,
               useExternalPlayer: useExternalPlayer,
             );
             ensureLaunchStillWanted(launchSession);
-            final selectedMediaSourceId = widget.selectedMediaSourceId;
+
             final dvForceTranscode =
-                !isAudio &&
                 context.mounted &&
                 await _shouldForceTranscodeForDolbyVision(context, [
-                  item,
-                ], mediaSourceId: selectedMediaSourceId);
+                  selectedEpisode,
+                ], mediaSourceId: widget.selectedMediaSourceId);
             final directAllowed = !dvForceTranscode && !forceTranscode;
             await _playQueueWithPrerolls(
               manager,
               launchSession: launchSession,
-              queue: <AggregatedItem>[item],
+              queue: episodeQueue,
               prerolls: prerolls,
-              target: item,
+              target: selectedEpisode,
+              startIndex: idx,
               startPosition: startPosition,
               audioStreamIndex: audioStreamIndex,
               subtitleStreamIndex: subtitleStreamIndex,
-              mediaSourceId: selectedMediaSourceId,
+              mediaSourceId: widget.selectedMediaSourceId,
               audioSelectionExplicit: viewModel.selectedAudioIndex != null,
               subtitleSelectionExplicit:
                   viewModel.selectedSubtitleIndex != null,
               directAllowed: directAllowed,
             );
-        }
-      },
-    );
+            break;
+          }
+          continue defaultCase;
+
+        case 'BoxSet':
+          final playableQueue = await _loadFolderPlayableItemsForShuffle(
+            item,
+            fields: 'Overview,RunTimeTicks,UserData',
+          );
+          if (playableQueue.isEmpty) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(AppLocalizations.of(context).noEpisodesLoaded),
+                ),
+              );
+            }
+            throw PlaybackStartupRecoveryAbortedException();
+          }
+
+          final (startIndex, startPosition) = _resolveQueueResumeStart(
+            playableQueue,
+          );
+
+          ensureLaunchStillWanted(launchSession);
+          var targetItem = playableQueue[startIndex];
+          targetItem = await _ensureHydrated(targetItem);
+          playableQueue[startIndex] = targetItem;
+          ensureLaunchStillWanted(launchSession);
+
+          final dvForceTranscode =
+              context.mounted &&
+              await _shouldForceTranscodeForDolbyVision(context, [targetItem]);
+          final directAllowed = !dvForceTranscode && !forceTranscode;
+
+          final epMediaStreams = _mediaStreamsForCurrentSelection(targetItem);
+          final epAudioStreams = epMediaStreams
+              .where((s) => s['Type'] == 'Audio')
+              .toList();
+          final epSubtitleStreams = epMediaStreams
+              .where((s) => s['Type'] == 'Subtitle')
+              .toList();
+          final epAudioStreamIndex = _effectiveAudioStreamIndex(epAudioStreams);
+          final epSubtitleStreamIndex = _effectiveSubtitleStreamIndex(
+            epSubtitleStreams,
+            epAudioStreams,
+            item: targetItem,
+          );
+
+          await runPlaybackStart(
+            launchSession,
+            () => manager.playItems(
+              playableQueue,
+              startIndex: startIndex,
+              startPosition: startPosition,
+              audioStreamIndex: epAudioStreamIndex,
+              subtitleStreamIndex: epSubtitleStreamIndex,
+              audioSelectionExplicit: false,
+              subtitleSelectionExplicit: false,
+              enableDirectPlay: directAllowed,
+              enableDirectStream: directAllowed,
+            ),
+          );
+          break;
+
+        case 'MusicArtist':
+          final client = _clientForItem(item);
+          final data = await client.itemsApi.getItems(
+            artistIds: [item.id],
+            includeItemTypes: const ['Audio'],
+            sortBy: 'Album,ParentIndexNumber,IndexNumber,SortName',
+            recursive: true,
+            fields: 'PrimaryImageAspectRatio,BasicSyncInfo',
+          );
+          final tracks = _mapRawItemsForServer(data['Items'], item.serverId);
+          if (tracks.isEmpty) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(AppLocalizations.of(context).noItemsFound),
+                ),
+              );
+            }
+            throw PlaybackStartupRecoveryAbortedException();
+          }
+          await runPlaybackStart(
+            launchSession,
+            () => manager.playItems(tracks),
+          );
+          break;
+
+        case 'MusicAlbum':
+          var tracks = viewModel.tracks;
+          if (tracks.isEmpty) {
+            final client = _clientForItem(item);
+            final data = await client.itemsApi.getItems(
+              parentId: item.id,
+              includeItemTypes: const ['Audio'],
+              sortBy: 'ParentIndexNumber,IndexNumber,SortName',
+              fields:
+                  'PrimaryImageAspectRatio,BasicSyncInfo,UserData,RunTimeTicks',
+            );
+            tracks = _mapRawItemsForServer(data['Items'], item.serverId);
+          }
+          if (tracks.isEmpty) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(AppLocalizations.of(context).noItemsFound),
+                ),
+              );
+            }
+            throw PlaybackStartupRecoveryAbortedException();
+          }
+          int albumStartIndex = 0;
+          if (resume) {
+            final resumeIdx = tracks.indexWhere(
+              (e) =>
+                  !e.isPlayed &&
+                  ((e.playbackPosition?.inMilliseconds ?? 0) > 0 ||
+                      (e.playedPercentage ?? 0) > 0),
+            );
+            if (resumeIdx >= 0) {
+              albumStartIndex = resumeIdx;
+            }
+          }
+          // Music remembers which track was playing but starts it from the
+          // beginning, matching standard music player behavior.
+          await runPlaybackStart(
+            launchSession,
+            () => manager.playItems(tracks, startIndex: albumStartIndex),
+          );
+          break;
+
+        case 'Playlist':
+          var tracks = viewModel.tracks;
+          if (tracks.isEmpty) {
+            final client = _clientForItem(item);
+            final data = await client.itemsApi.getPlaylistItems(item.id);
+            tracks = _mapRawItemsForServer(data['Items'], item.serverId);
+          }
+          if (tracks.isEmpty) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(AppLocalizations.of(context).noItemsFound),
+                ),
+              );
+            }
+            throw PlaybackStartupRecoveryAbortedException();
+          }
+          ensureLaunchStillWanted(launchSession);
+
+          // Start at the first unwatched item, or resume the one left partway
+          // through, instead of always restarting from the top.
+          final (startIndex, startPosition) = _resolveQueueResumeStart(tracks);
+
+          // Playlists can contain video, so honor the Dolby Vision
+          // force-transcode check before allowing direct play/stream.
+          final dvForceTranscode =
+              context.mounted &&
+              await _shouldForceTranscodeForDolbyVision(context, tracks);
+          final directAllowed = !dvForceTranscode && !forceTranscode;
+          await runPlaybackStart(
+            launchSession,
+            () => manager.playItems(
+              tracks,
+              startIndex: startIndex,
+              startPosition: startPosition,
+              enableDirectPlay: directAllowed,
+              enableDirectStream: directAllowed,
+            ),
+          );
+          break;
+
+        case 'AudioBook':
+          final client = _clientForItem(item);
+          const audioChildFields =
+              'BasicSyncInfo,PrimaryImageAspectRatio,RunTimeTicks,MediaSources,MediaSourceCount,MediaType,IndexNumber,ParentIndexNumber,Artists,AlbumArtist,Genres,Chapters,UserData';
+          bool isAudioChild(dynamic e) {
+            final childType = e is Map ? e['Type']?.toString() : null;
+            return childType == 'Audio' || childType == 'AudioBook';
+          }
+
+          // A container audiobook lists its chapters as child items, so only
+          // a folder is worth asking about. A ParentId query against a leaf
+          // times the server out, and where it answers it ignores the filter
+          // and hands back the top level libraries, which the check drops.
+          if (item.isFolder) {
+            final data = await client.itemsApi.getItems(
+              parentId: item.id,
+              includeItemTypes: const ['Audio', 'AudioBook'],
+              sortBy: 'ParentIndexNumber,IndexNumber,SortName',
+              fields: audioChildFields,
+            );
+            final rawChildren = (data['Items'] as List?) ?? const [];
+            final childItems = rawChildren.where(isAudioChild).toList();
+            if (childItems.isNotEmpty) {
+              final children = _mapRawItemsForServer(childItems, item.serverId);
+              int startIndex = 0;
+              Duration startPos = Duration.zero;
+              if (resume) {
+                final resumeIdx = children.indexWhere(
+                  (e) =>
+                      !e.isPlayed &&
+                      ((e.playbackPosition?.inMilliseconds ?? 0) > 0 ||
+                          (e.playedPercentage ?? 0) > 0),
+                );
+                if (resumeIdx >= 0) {
+                  startIndex = resumeIdx;
+                  startPos =
+                      children[resumeIdx].playbackPosition ?? Duration.zero;
+                } else {
+                  final nextUnplayed = children.indexWhere((e) => !e.isPlayed);
+                  if (nextUnplayed >= 0) {
+                    startIndex = nextUnplayed;
+                  }
+                }
+              }
+              await runPlaybackStart(
+                launchSession,
+                () => manager.playItems(
+                  children,
+                  startIndex: startIndex,
+                  startPosition: startPos,
+                ),
+              );
+              break;
+            }
+          }
+
+          // Leaf audiobook: enqueue the sibling chapters from the parent
+          // folder so the book plays through, starting at this file.
+          final parentId = item.rawData['ParentId']?.toString();
+          if (parentId != null && parentId.isNotEmpty) {
+            final siblingData = await client.itemsApi.getItems(
+              parentId: parentId,
+              includeItemTypes: const ['Audio', 'AudioBook'],
+              sortBy: 'ParentIndexNumber,IndexNumber,SortName',
+              fields: audioChildFields,
+            );
+            final siblingsRaw = (siblingData['Items'] as List?) ?? const [];
+            final siblings = _mapRawItemsForServer(
+              siblingsRaw.where(isAudioChild).toList(),
+              item.serverId,
+            );
+            final startIndex = siblings.indexWhere((t) => t.id == item.id);
+            if (siblings.isNotEmpty && startIndex >= 0) {
+              final targetSibling = siblings[startIndex];
+              final startPos = resume
+                  ? (targetSibling.playbackPosition ??
+                        item.playbackPosition ??
+                        Duration.zero)
+                  : Duration.zero;
+              await runPlaybackStart(
+                launchSession,
+                () => manager.playItems(
+                  siblings,
+                  startIndex: startIndex,
+                  startPosition: startPos,
+                ),
+              );
+              break;
+            }
+          }
+
+          continue defaultCase;
+
+        defaultCase:
+        default:
+          final startPosition = resume
+              ? (item.playbackPosition ?? Duration.zero)
+              : Duration.zero;
+          final prerolls = await _prerollsForStart(
+            item,
+            startPosition,
+            useExternalPlayer: useExternalPlayer,
+          );
+          ensureLaunchStillWanted(launchSession);
+          final selectedMediaSourceId = widget.selectedMediaSourceId;
+          final dvForceTranscode =
+              !isAudio &&
+              context.mounted &&
+              await _shouldForceTranscodeForDolbyVision(context, [
+                item,
+              ], mediaSourceId: selectedMediaSourceId);
+          final directAllowed = !dvForceTranscode && !forceTranscode;
+          await _playQueueWithPrerolls(
+            manager,
+            launchSession: launchSession,
+            queue: <AggregatedItem>[item],
+            prerolls: prerolls,
+            target: item,
+            startPosition: startPosition,
+            audioStreamIndex: audioStreamIndex,
+            subtitleStreamIndex: subtitleStreamIndex,
+            mediaSourceId: selectedMediaSourceId,
+            audioSelectionExplicit: viewModel.selectedAudioIndex != null,
+            subtitleSelectionExplicit: viewModel.selectedSubtitleIndex != null,
+            directAllowed: directAllowed,
+          );
+      }
+    });
 
     await _pushPlayerRouteWhileStartingPlayback(
       context,
@@ -10733,17 +10823,15 @@ Future<_DolbyVisionPlayDecision?> _showDolbyVisionFallbackDecisionDialog(
               FocusableButton(
                 autofocus: true,
                 onPressed: () {
-                  Navigator.of(
-                    dialogContext,
-                  ).pop(DolbyVisionFallbackBehavior.hdr10Fallback);
+                  Navigator.of(dialogContext)
+                      .pop(DolbyVisionFallbackBehavior.hdr10Fallback);
                 },
                 child: Text(l10n.playHdr10Fallback),
               ),
               FocusableButton(
                 onPressed: () {
-                  Navigator.of(
-                    dialogContext,
-                  ).pop(DolbyVisionFallbackBehavior.transcode);
+                  Navigator.of(dialogContext)
+                      .pop(DolbyVisionFallbackBehavior.transcode);
                 },
                 child: Text(l10n.requestTranscode),
               ),
@@ -11176,9 +11264,8 @@ class _DownloadButtonState extends State<_DownloadButton> {
 
     final sizeLabel = label(formatBytes(totalBytes));
     if (knownCount == items.length) return sizeLabel;
-    final unknown = AppLocalizations.of(
-      context,
-    ).downloadEstimateUnknownCount(items.length - knownCount);
+    final unknown = AppLocalizations.of(context)
+        .downloadEstimateUnknownCount(items.length - knownCount);
     return '$sizeLabel ($unknown)';
   }
 
@@ -11296,9 +11383,8 @@ class _DownloadButtonState extends State<_DownloadButton> {
             activeColor: const Color(0xFFD32F2F),
             onPressed: () {
               if (downloadError.isNotEmpty) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text(downloadError)));
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(SnackBar(content: Text(downloadError)));
               }
               _showDownloadOptions(context, downloadService);
             },
@@ -11344,10 +11430,8 @@ class _DownloadButtonState extends State<_DownloadButton> {
     padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
     child: Text(
       text,
-      style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(
-        color: Colors.white,
-        fontWeight: FontWeight.bold,
-      ),
+      style: Theme.of(sheetContext).textTheme.titleMedium
+          ?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
     ),
   );
 
@@ -11510,7 +11594,12 @@ class _DownloadButtonState extends State<_DownloadButton> {
     // restores focus to the Download button rather than to a disposed row.
     if (!context.mounted) return;
     if (autoChosen) {
-      await _toggleAutoDownload(context, item, autoDownloads!, existing: subscription);
+      await _toggleAutoDownload(
+        context,
+        item,
+        autoDownloads!,
+        existing: subscription,
+      );
       return;
     }
     if (chosen == null) return;
@@ -11819,9 +11908,8 @@ class _DownloadButtonState extends State<_DownloadButton> {
     final String message;
     if (items != null) {
       if (items.isEmpty) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l10n.noEpisodesLoaded)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(l10n.noEpisodesLoaded)));
         return;
       }
       service.downloadItems(items, quality: quality, ownerId: item.id);
@@ -12683,10 +12771,11 @@ class _DetailActionButtonState extends State<_DetailActionButton>
                         SizedBox(height: isMobile ? 6 : 8 * desktopScale),
                         Text(
                           widget.label,
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: labelColor,
-                            fontWeight: FontWeight.w600,
-                          ),
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: labelColor,
+                                fontWeight: FontWeight.w600,
+                              ),
                           textAlign: TextAlign.center,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -12702,13 +12791,28 @@ class _DetailActionButtonState extends State<_DetailActionButton>
 }
 
 class _SpotlightOverflowTile extends StatefulWidget {
-  final _DetailActionButton action;
+  final String label;
+  final IconData? icon;
+  final Widget Function(double size, Color color)? iconBuilder;
+  final bool isActive;
+  final Color? activeColor;
+
+  /// Draws the row as leading somewhere else rather than as an action: a
+  /// trailing chevron, so a nested screen doesn't read as something that
+  /// already happened.
+  final bool opensNestedScreen;
+
   final bool autofocus;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
 
   const _SpotlightOverflowTile({
-    required this.action,
+    required this.label,
+    this.icon,
+    this.iconBuilder,
+    this.isActive = false,
+    this.activeColor,
+    this.opensNestedScreen = false,
     this.autofocus = false,
     required this.onTap,
     this.onLongPress,
@@ -12754,7 +12858,6 @@ class _SpotlightOverflowTileState extends State<_SpotlightOverflowTile> {
 
   @override
   Widget build(BuildContext context) {
-    final action = widget.action;
     final isTv = PlatformDetection.isTV;
     final showHighlight = _isFocused || _isHovered;
 
@@ -12767,18 +12870,18 @@ class _SpotlightOverflowTileState extends State<_SpotlightOverflowTile> {
 
     final iconColor = showHighlight
         ? (isTv ? focusedFg : AppColorScheme.accent)
-        : (action.isActive
-            ? (action.activeColor ?? AppColorScheme.accent)
-            : Colors.white.withValues(alpha: 0.85));
+        : (widget.isActive
+              ? (widget.activeColor ?? AppColorScheme.accent)
+              : Colors.white.withValues(alpha: 0.85));
 
     // The plain icon first. The builders draw for the button row, where the
     // rating one pairs a thumb up and down and the star one part fills, and
     // both come out a smudge at 22. The label carries the rating anyway.
     final Widget? leadingWidget;
-    if (action.icon != null) {
-      leadingWidget = AdaptiveIcon(action.icon!, color: iconColor, size: 22);
-    } else if (action.iconBuilder != null) {
-      leadingWidget = action.iconBuilder!(22, iconColor);
+    if (widget.icon != null) {
+      leadingWidget = AdaptiveIcon(widget.icon!, color: iconColor, size: 22);
+    } else if (widget.iconBuilder != null) {
+      leadingWidget = widget.iconBuilder!(22, iconColor);
     } else {
       leadingWidget = null;
     }
@@ -12816,15 +12919,15 @@ class _SpotlightOverflowTileState extends State<_SpotlightOverflowTile> {
               decoration: BoxDecoration(
                 color: showHighlight
                     ? (isTv
-                        ? focusBg
-                        : AppColorScheme.accent.withValues(alpha: 0.16))
+                          ? focusBg
+                          : AppColorScheme.accent.withValues(alpha: 0.16))
                     : Colors.transparent,
                 borderRadius: AppRadius.circular(10),
                 border: Border.all(
                   color: showHighlight
                       ? (isTv
-                          ? focusColor
-                          : AppColorScheme.accent.withValues(alpha: 0.6))
+                            ? focusColor
+                            : AppColorScheme.accent.withValues(alpha: 0.6))
                       : Colors.white.withValues(alpha: 0.15),
                   width: showHighlight ? 1.5 : 1.0,
                 ),
@@ -12842,16 +12945,24 @@ class _SpotlightOverflowTileState extends State<_SpotlightOverflowTile> {
                   ],
                   Expanded(
                     child: Text(
-                      action.label,
+                      widget.label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: textColor,
-                        fontWeight: action.isActive ? FontWeight.w600 : FontWeight.w500,
+                        fontWeight: widget.isActive
+                            ? FontWeight.w600
+                            : FontWeight.w500,
                         fontSize: 15,
                       ),
                     ),
                   ),
+                  if (widget.opensNestedScreen)
+                    AdaptiveIcon(
+                      Icons.chevron_right,
+                      color: textColor.withValues(alpha: 0.6),
+                      size: 20,
+                    ),
                 ],
               ),
             ),
@@ -12915,12 +13026,7 @@ class DetailCastRow extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         clipBehavior: Clip.none,
         // The ring around each avatar adds the other 3.5.
-        padding: const EdgeInsets.fromLTRB(
-          4,
-          _kDetailRowTopInset - 3.5,
-          4,
-          12,
-        ),
+        padding: const EdgeInsets.fromLTRB(4, _kDetailRowTopInset - 3.5, 4, 12),
         itemCount: people.length,
         separatorBuilder: (_, _) =>
             SizedBox(width: isMobile ? 12 : 16 * desktopScale),
@@ -14288,6 +14394,12 @@ class DetailSeasonsRow extends StatelessWidget {
   /// it is not in the library.
   final void Function(int seasonNumber)? onSeasonTap;
 
+  /// Overrides the resting height and card width, so a host that has to fit
+  /// the seasons into a tighter band than a full-width row (the Spotlight
+  /// hero column) can shrink them without changing what the row draws.
+  final double? height;
+  final double? cardWidth;
+
   const DetailSeasonsRow({
     required this.seasons,
     required this.imageApi,
@@ -14298,6 +14410,8 @@ class DetailSeasonsRow extends StatelessWidget {
     this.onItemLongPress,
     this.seerrSeasonStatus,
     this.onSeasonTap,
+    this.height,
+    this.cardWidth,
   });
 
   @override
@@ -14307,10 +14421,11 @@ class DetailSeasonsRow extends StatelessWidget {
     final cardExpansion = prefs.get(UserPreferences.cardFocusExpansion);
     final isMobile = _isCompact(context);
     final desktopScale = _desktopUiScale(prefs: prefs);
-    final cardWidth = isMobile ? 120.0 : 150.0 * desktopScale;
+    final cardWidth =
+        this.cardWidth ?? (isMobile ? 120.0 : 150.0 * desktopScale);
 
     return SizedBox(
-      height: isMobile ? 230 : 290 * desktopScale,
+      height: height ?? (isMobile ? 230 : 290 * desktopScale),
       child: ListView.separated(
         controller: scrollController,
         scrollDirection: Axis.horizontal,
@@ -14321,8 +14436,9 @@ class DetailSeasonsRow extends StatelessWidget {
             SizedBox(width: isMobile ? 8 : 12 * desktopScale),
         itemBuilder: (context, index) {
           final season = seasons[index];
-          final showAvailabilityBadges =
-              prefs.get(UserPreferences.showSeerrAvailabilityBadges);
+          final showAvailabilityBadges = prefs.get(
+            UserPreferences.showSeerrAvailabilityBadges,
+          );
           final seerrStatus = seerrSeasonStatus?[season.indexNumber];
           final hasSeerrDot =
               showAvailabilityBadges && SeerrMediaStatus.hasDot(seerrStatus);
@@ -14436,6 +14552,116 @@ class DetailSeasonsRow extends StatelessWidget {
   }
 }
 
+/// A series' season choices laid out directly on the detail screen: a titled
+/// strip of every season, under the hero, in place of the single teaser card a
+/// hero-first layout would otherwise spend on it. A series with one season
+/// keeps the teaser, because there is nothing to choose between.
+///
+/// The host owns the focus wiring, exactly like a [DetailSeasonsRow] caller:
+/// hand in the node the first card should claim and translate the d-pad keys
+/// so the strip is one stop in the page's vertical chain.
+class DetailInlineSeasonsSection extends StatelessWidget {
+  final List<AggregatedItem> seasons;
+  final ImageApi imageApi;
+  final UserPreferences prefs;
+  final ScrollController? scrollController;
+  final FocusNode? firstItemFocusNode;
+  final KeyEventResult Function(int index, KeyEvent event)? onItemKeyEvent;
+  final Map<int, int>? seerrSeasonStatus;
+
+  /// Resting height of the strip. Sized by the host, which is the only place
+  /// that knows how much room the surrounding layout has left.
+  final double height;
+
+  /// Resting poster width, and with it the poster height at 2:3.
+  final double cellWidth;
+
+  const DetailInlineSeasonsSection({
+    super.key,
+    required this.seasons,
+    required this.imageApi,
+    required this.prefs,
+    required this.height,
+    required this.cellWidth,
+    this.scrollController,
+    this.firstItemFocusNode,
+    this.onItemKeyEvent,
+    this.seerrSeasonStatus,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (seasons.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _InlineSectionHeader(
+          title: AppLocalizations.of(context).seasons,
+          count: seasons.length,
+        ),
+        const SizedBox(height: 10),
+        DetailSeasonsRow(
+          seasons: seasons,
+          imageApi: imageApi,
+          prefs: prefs,
+          scrollController: scrollController,
+          firstItemFocusNode: firstItemFocusNode,
+          onItemKeyEvent: onItemKeyEvent,
+          seerrSeasonStatus: seerrSeasonStatus,
+          height: height,
+          cardWidth: cellWidth,
+        ),
+      ],
+    );
+  }
+}
+
+/// The title-and-count line the Spotlight section modals put above a grid,
+/// reused so a section that lives on the page itself reads as the same kind of
+/// section as one that opens in a modal.
+class _InlineSectionHeader extends StatelessWidget {
+  final String title;
+  final int count;
+
+  const _InlineSectionHeader({required this.title, required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: AppColorScheme.onSurface,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            '$count',
+            style: textTheme.labelMedium?.copyWith(
+              color: AppColorScheme.onSurface.withValues(alpha: 0.7),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _EpisodesRow extends StatelessWidget {
   final List<AggregatedItem> episodes;
   final String currentEpisodeId;
@@ -14471,9 +14697,8 @@ class _EpisodesRow extends StatelessWidget {
     // from overflowing the row and clipping the labels.
     final imageHeight = isMobile ? 100.0 : 124 * desktopScale;
     final labelStyle = Theme.of(context).textTheme.bodySmall;
-    final labelLine = MediaQuery.textScalerOf(
-      context,
-    ).scale((labelStyle?.fontSize ?? 12) * (labelStyle?.height ?? 1.4));
+    final labelLine = MediaQuery.textScalerOf(context)
+        .scale((labelStyle?.fontSize ?? 12) * (labelStyle?.height ?? 1.4));
 
     return SizedBox(
       height: _kDetailRowTopInset + imageHeight + 10 + labelLine + 6,

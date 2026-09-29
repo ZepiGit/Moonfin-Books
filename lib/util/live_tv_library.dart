@@ -14,6 +14,8 @@ List<AggregatedLibrary> librariesForNav(
   List<AggregatedLibrary> libraries,
   bool hasLiveTvButton, {
   bool hideLiveTv = false,
-}) => hasLiveTvButton || hideLiveTv
-    ? libraries.where((lib) => !isLiveTvLibrary(lib)).toList()
-    : libraries;
+}) => orderMichelFlixLibraries(
+  hasLiveTvButton || hideLiveTv
+      ? libraries.where((lib) => !isLiveTvLibrary(lib)).toList()
+      : libraries,
+);

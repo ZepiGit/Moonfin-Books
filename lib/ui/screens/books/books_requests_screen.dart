@@ -10,6 +10,7 @@ import 'package:server_core/server_core.dart';
 import '../../../auth/repositories/session_repository.dart';
 import '../../../auth/repositories/user_repository.dart';
 import '../../../data/repositories/books_repository.dart';
+import '../../../data/repositories/sheet_music_repository.dart';
 import '../../../data/services/plugin_sync_service.dart';
 import '../../../data/viewmodels/books_requests_view_model.dart';
 import '../../../l10n/app_localizations.dart';
@@ -24,6 +25,7 @@ import '../../widgets/bottom_nav/bottom_navbar.dart';
 import '../../widgets/navigation_layout.dart';
 import '../../widgets/overlay_sheet.dart';
 import '../../widgets/top_toolbar.dart';
+import 'sheet_music_search_dialog.dart';
 
 class BooksRequestsScreen extends StatefulWidget {
   const BooksRequestsScreen({
@@ -45,6 +47,9 @@ class _BooksRequestsScreenState extends State<BooksRequestsScreen>
   final TextEditingController _search = TextEditingController();
   final FocusNode _searchFocus = FocusNode(debugLabel: 'books-search');
   final GlobalKey<CustomTVTextFieldState> _tvFieldKey = GlobalKey();
+  final TextEditingController _author = TextEditingController();
+  final FocusNode _authorFocus = FocusNode(debugLabel: 'books-author');
+  final GlobalKey<CustomTVTextFieldState> _tvAuthorKey = GlobalKey();
   Timer? _statusTimer;
   bool _visible = true;
   bool _routeVisible = true;
@@ -64,6 +69,8 @@ class _BooksRequestsScreenState extends State<BooksRequestsScreen>
     _model = BooksRequestsViewModel(_repository)..addListener(_changed);
     _search.addListener(_changed);
     _searchFocus.addListener(_changed);
+    _author.addListener(_changed);
+    _authorFocus.addListener(_changed);
     WidgetsBinding.instance.addObserver(this);
     if (GetIt.instance.isRegistered<PluginSyncService>()) {
       GetIt.instance<PluginSyncService>().addListener(_onCapabilityChanged);
@@ -122,6 +129,9 @@ class _BooksRequestsScreenState extends State<BooksRequestsScreen>
     _search.removeListener(_changed);
     _search.clear();
     _search.addListener(_changed);
+    _author.removeListener(_changed);
+    _author.clear();
+    _author.addListener(_changed);
     _model.bindIdentity(next);
   }
 
@@ -164,7 +174,78 @@ class _BooksRequestsScreenState extends State<BooksRequestsScreen>
     _search.dispose();
     _searchFocus.removeListener(_changed);
     _searchFocus.dispose();
+    _author.removeListener(_changed);
+    _author.dispose();
+    _authorFocus.removeListener(_changed);
+    _authorFocus.dispose();
     super.dispose();
+  }
+
+  Future<void> _runSearch() =>
+      _model.search(_search.text, author: _author.text);
+
+  Future<void> _openSheetMusic() => showDialog<void>(
+    context: context,
+    builder: (_) => SheetMusicSearchDialog(
+      repository: SheetMusicRepository(GetIt.instance<MediaServerClient>()),
+    ),
+  );
+
+  Widget _authorField({required bool tv, required bool german}) {
+    final hint = german ? 'Autor (optional)' : 'Author (optional)';
+    final clear = _author.text.isEmpty
+        ? null
+        : IconButton(
+            tooltip: AppLocalizations.of(context).clear,
+            onPressed: _author.clear,
+            icon: const Icon(Icons.close_rounded),
+          );
+    if (!tv) {
+      return TextField(
+        key: const ValueKey('books-author'),
+        controller: _author,
+        focusNode: _authorFocus,
+        decoration: InputDecoration(
+          labelText: hint,
+          prefixIcon: const Icon(Icons.person_search_rounded),
+          suffixIcon: clear,
+        ),
+        textInputAction: TextInputAction.search,
+        onSubmitted: (_) => _runSearch(),
+      );
+    }
+    return Focus(
+      key: const ValueKey('books-author'),
+      focusNode: _authorFocus,
+      onKeyEvent: (node, event) {
+        if (node.hasPrimaryFocus &&
+            event is KeyDownEvent &&
+            event.logicalKey.isSelectKey) {
+          _tvAuthorKey.currentState?.openKeyboard();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: CustomTVTextField(
+        key: _tvAuthorKey,
+        controller: _author,
+        isFocused: _authorFocus.hasFocus,
+        hint: hint,
+        textStyle: TextStyle(color: AppColorScheme.onSurface, fontSize: 20),
+        hintStyle: TextStyle(
+          color: AppColorScheme.onSurface.withValues(alpha: 0.7),
+          fontSize: 20,
+        ),
+        inputPurpose: InputPurpose.search,
+        popParentOnKeyboardClose: false,
+        prefixIcon: const Icon(Icons.person_search_rounded),
+        suffixIcon: clear,
+        filled: true,
+        fillColor: AppColorScheme.surfaceVariant,
+        focusedBorderColor: AppColorScheme.accent,
+        onFieldSubmitted: (_) => _runSearch(),
+      ),
+    );
   }
 
   Future<void> _openReleases(BookResult book) async {
@@ -458,7 +539,8 @@ class _BooksRequestsScreenState extends State<BooksRequestsScreen>
                                                 AppColorScheme.surfaceVariant,
                                             focusedBorderColor:
                                                 AppColorScheme.accent,
-                                            onFieldSubmitted: _model.search,
+                                            onFieldSubmitted: (_) =>
+                                                _runSearch(),
                                           ),
                                         )
                                       : TextField(
@@ -482,15 +564,26 @@ class _BooksRequestsScreenState extends State<BooksRequestsScreen>
                                           ),
                                           textInputAction:
                                               TextInputAction.search,
-                                          onSubmitted: _model.search,
+                                          onSubmitted: (_) => _runSearch(),
                                         ),
                                 ),
                                 const SizedBox(width: 8),
                                 FilledButton(
-                                  onPressed: () => _model.search(_search.text),
+                                  onPressed: _runSearch,
                                   child: Text(l10n.search),
                                 ),
                               ],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 800),
+                            child: _authorField(
+                              tv: tv,
+                              german:
+                                  Localizations.localeOf(context)
+                                      .languageCode ==
+                                  'de',
                             ),
                           ),
                           const SizedBox(height: 16),
@@ -511,6 +604,17 @@ class _BooksRequestsScreenState extends State<BooksRequestsScreen>
                             selected: {_model.type},
                             onSelectionChanged: (selected) =>
                                 _model.setType(selected.first),
+                          ),
+                          const SizedBox(height: 8),
+                          OutlinedButton.icon(
+                            onPressed: _openSheetMusic,
+                            icon: const Icon(Icons.music_note_rounded),
+                            label: Text(
+                              Localizations.localeOf(context).languageCode ==
+                                      'de'
+                                  ? 'Noten'
+                                  : 'Sheet music',
+                            ),
                           ),
                           const SizedBox(height: 24),
                           if (_model.searching)
@@ -539,13 +643,13 @@ class _BooksRequestsScreenState extends State<BooksRequestsScreen>
                                   : l10n.booksSearchFailed,
                             ),
                             TextButton(
-                              onPressed: () => _model.search(_search.text),
+                              onPressed: _runSearch,
                               child: Text(l10n.booksRetry),
                             ),
                           ] else if (!_model.searching &&
                               _model.results.isEmpty)
                             Text(
-                              _model.query.isEmpty
+                              _model.query.isEmpty && _model.author.isEmpty
                                   ? l10n.booksSearchPrompt
                                   : l10n.booksSearchEmpty,
                             ),
@@ -847,14 +951,35 @@ class _BookReleasesDialogState extends State<BookReleasesDialog> {
                   ],
                 );
               }
-              final releases = snapshot.data!;
+              final releases = assessReleases(
+                widget.book,
+                snapshot.data!,
+                widget.type,
+              );
               if (releases.isEmpty) return Text(l10n.booksReleasesEmpty);
+              final german =
+                  Localizations.localeOf(context).languageCode == 'de';
+              final unknown = german ? 'unbekannt' : 'unknown';
               return ListView.builder(
                 shrinkWrap: true,
                 itemCount: releases.length,
                 itemBuilder: (context, index) {
-                  final release = releases[index];
+                  final assessment = releases[index];
+                  final release = assessment.release;
                   final selected = identical(_selected, release);
+                  final warning = assessment.formatMismatch
+                      ? (german
+                            ? 'Format passt nicht zum Medientyp'
+                            : 'Format does not match this media type')
+                      : assessment.languageMismatch
+                      ? (german
+                            ? 'Nur deutsche und englische Ausgaben'
+                            : 'German and English editions only')
+                      : !assessment.likely
+                      ? (german
+                            ? 'Unsichere Übereinstimmung mit dem Buch'
+                            : 'Uncertain match for this book')
+                      : null;
                   return ListTile(
                     key: ValueKey(
                       'books-release:${release.source}:${release.sourceId}',
@@ -866,7 +991,11 @@ class _BookReleasesDialogState extends State<BookReleasesDialog> {
                           ? Icons.radio_button_checked
                           : Icons.radio_button_unchecked,
                     ),
-                    onTap: _starting || _started
+                    onTap:
+                        _starting ||
+                            _started ||
+                            assessment.formatMismatch ||
+                            assessment.languageMismatch
                         ? null
                         : () => setState(() => _selected = release),
                     title: Text(
@@ -874,12 +1003,28 @@ class _BookReleasesDialogState extends State<BookReleasesDialog> {
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    subtitle: Text(
-                      [
-                        release.format,
-                        release.language,
-                        release.size,
-                      ].whereType<String>().join(' · '),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          [
+                            'Format: ${release.format ?? unknown}',
+                            '${german ? 'Sprache' : 'Language'}: ${release.language ?? unknown}',
+                            if (release.size != null) release.size!,
+                          ].join(' · '),
+                        ),
+                        if (warning != null)
+                          Row(
+                            key: ValueKey(
+                              'books-release-warning:${release.source}:${release.sourceId}',
+                            ),
+                            children: [
+                              const Icon(Icons.warning_amber, size: 16),
+                              const SizedBox(width: 4),
+                              Expanded(child: Text(warning)),
+                            ],
+                          ),
+                      ],
                     ),
                   );
                 },

@@ -14,6 +14,7 @@ class BooksRequestsViewModel extends ChangeNotifier {
 
   BooksMediaType type = BooksMediaType.ebook;
   String query = '';
+  String author = '';
   List<BookResult> results = const [];
   List<BookDownload> downloads = const [];
   int get activeCount => downloads
@@ -42,6 +43,7 @@ class BooksRequestsViewModel extends ChangeNotifier {
     _searchVersion++;
     type = BooksMediaType.ebook;
     query = '';
+    author = '';
     results = const [];
     downloads = const [];
     searching = false;
@@ -58,16 +60,25 @@ class BooksRequestsViewModel extends ChangeNotifier {
     hasMore = false;
     _searchVersion++;
     _notify();
-    if (query.trim().isNotEmpty) search(query);
+    if (query.trim().isNotEmpty || author.isNotEmpty) {
+      search(query, author: author);
+    }
   }
 
-  Future<void> search(String next, {bool more = false}) async {
+  /// [author] is optional extra input for a new search (empty when omitted);
+  /// paging reuses the author of the search being extended.
+  Future<void> search(String next, {bool more = false, String? author}) async {
     final trimmed = next.trim();
-    if (trimmed.isEmpty || (more && (loadingMore || !hasMore))) return;
+    final effectiveAuthor = (more ? this.author : author ?? '').trim();
+    if ((trimmed.isEmpty && effectiveAuthor.isEmpty) ||
+        (more && (loadingMore || !hasMore))) {
+      return;
+    }
     final generation = _generation;
     final version = more ? _searchVersion : ++_searchVersion;
     if (!more) {
       query = trimmed;
+      this.author = effectiveAuthor;
       results = const [];
       searching = true;
       searchError = null;
@@ -81,6 +92,7 @@ class BooksRequestsViewModel extends ChangeNotifier {
         trimmed,
         type,
         page: more ? page + 1 : 1,
+        author: this.author,
       );
       if (!_current(generation) || version != _searchVersion) return;
       results = more ? [...results, ...response.books] : response.books;
