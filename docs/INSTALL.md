@@ -7,7 +7,7 @@ Moonfin Books is the client fork that adds a native **Books** request tab. Your 
 ## Before installing
 
 1. Check [current build status](BUILD_STATUS.md) for the built packages, signing status and actual runtime coverage. A successful build does not mean testing on every physical device.
-2. Download the preview from [Moonfin Books Preview 2](https://github.com/ZepiGit/Moonfin-Books/releases/tag/v2.6.0-books.2). Choose your operating system and CPU architecture, compare its SHA-256 with the release checksum, and keep the package for rollback. A temporary CI artifact is not a release.
+2. Download the preview from [Moonfin Books Preview 3](https://github.com/ZepiGit/Moonfin-Books/releases/tag/v2.6.0-books.3). Choose your operating system and CPU architecture, compare its SHA-256 with the release checksum, and keep the package for rollback. A temporary CI artifact is not a release.
 3. Ask your administrator for the Jellyfin server URL. Use a URL that already works for normal Jellyfin sign-in; do not enter a private Shelfmark URL or any server secret in the app.
 
 ## Choose and install a package
