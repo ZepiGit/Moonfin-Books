@@ -1,0 +1,5 @@
+Moonfin Books Preview 3 fixes opening imported sheet-music PDFs in the web app. Previously, "Open in app" could reach the Jellyfin item but fail while loading the file because the reader used a native-only HTTP client. The web reader now downloads through the browser-compatible client and displays the score; the dialog also passes the originating server to the reader.
+
+The existing Preview 2 features remain: German and English book discovery, sheet-music requests and file download, the revised series/anime layout, no automatic Kids selection, and library order Filme, Serien, Anime, Bücher, Hörbücher, Noten, Filme Kids, Serien Kids. Plugin Preview 4 (`2.3.1.103`) bundles this web build and broadens sheet-music search across Mutopia and Internet Archive.
+
+The build is a personal adaptation of official Moonfin, shared for others who want the same features. It is not an official upstream or app-store release. Verify `SHA256SUMS` and `SOURCE_REVISIONS.txt` against the downloaded packages. iOS/tvOS IPAs are unsigned; macOS is ad hoc signed and Windows packages have no publisher signature. See `docs/BUILD_STATUS.md` for device coverage.

@@ -1,4 +1,4 @@
-name: Publish Moonfin Books Preview 2
+name: Publish Moonfin Books Preview 3
 on:
   workflow_dispatch:
     inputs:
@@ -27,7 +27,7 @@ jobs:
           SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
           set -euo pipefail
-          test "$SOURCE_SHA" = '735d6ce24244c5cbc771e349bdff259874615025'
+          test "$SOURCE_SHA" = 'fd1cf1f666eee12824482bd25bd6bb59347323c4'
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" > /tmp/run.json
           python3 - <<'PY'
           import json, os
@@ -72,7 +72,7 @@ jobs:
           (out / 'SOURCE_REVISIONS.txt').write_text(
               f"Apps: {os.environ['SOURCE_SHA']}\n"
               f"Build run: {os.environ['RUN_ID']}\n"
-              'Matching plugin: 88753a4d51bf0d3b9944a58b7cc5ceede722d7d8\n')
+              'Matching plugin: 23603c18b762f22978c3f2935e399fc1700b7324\n')
           print('verified_packages', len(files))
           PY
       - name: Publish prerelease
@@ -81,12 +81,12 @@ jobs:
           SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
           set -euo pipefail
-          tag=v2.6.0-books.2
+          tag=v2.6.0-books.3
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo 'Release already exists; refusing to overwrite it' >&2
             exit 1
           fi
           gh release create "$tag" release/* --repo "$GITHUB_REPOSITORY" \
             --target "$SOURCE_SHA" --prerelease \
-            --title 'Moonfin Books 2.6.0 — Preview 2' \
-            --notes-file docs/PREVIEW2_RELEASE.md
+            --title 'Moonfin Books 2.6.0 — Preview 3' \
+            --notes-file docs/PREVIEW3_RELEASE.md
